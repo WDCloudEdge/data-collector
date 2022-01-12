@@ -21,13 +21,6 @@ class Config():
         self.step = 1
 
         # jarger
-        self.jaeger_url = 'http://121.4.170.179:15033/api/traces?'
+        self.jaeger_url = 'http://121.4.170.179:15032/jaeger/api/traces?'
         self.lookBack = 'custom'
-        self.limit = 1000000
-
-
-    def build_trace_urls(self):
-        # 为每一个服务拼接一个获取地址
-        urls = ['{}end={}&start={}&limit={}&lookback={}&maxDuration&minDuration&service={}' \
-                .format(self.jaeger_url, self.end, self.start, self.limit, self.lookBack, svc) for svc in self.svcs]           
-        return urls
+        self.limit = 1000

@@ -1,2 +1,5 @@
-def collect():
+from Config import Config
+
+
+def collect(config: Config):
     pass
