@@ -22,9 +22,9 @@ def collect(config: Config):
 
     metric_df = pd.concat([ctn_metric_df, node_metric_df], axis=1)
 
-    call_df.to_csv('data/call.csv')
-    latency_df.to_csv('data/latency.csv')
-    metric_df.to_csv('data/metric.csv')
+    call_df.to_csv('data/metric/call.csv')
+    latency_df.to_csv('data/metric/latency.csv')
+    metric_df.to_csv('data/metric/metric.csv')
 
 
 # 收集调用关系

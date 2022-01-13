@@ -7,9 +7,9 @@ def collect(config: Config):
     urls = build_trace_urls(config)
     traces_dict = {}
     for url in urls:  
-        trace_dict = handle(pull(url))
+        trace_dict = handle(execute(url))
         traces_dict = {**traces_dict, **trace_dict}
-    pipe_path='data/traces.pkl'
+    pipe_path='data/trace/traces.pkl'
     with open(pipe_path,'wb') as fw:
         pickle.dump(list(traces_dict.values()),fw)
        
@@ -38,7 +38,7 @@ def build_trace_urls(config: Config):
     # return urls
 
 
-def pull(url):
+def execute(url):
     '''
         拉取trace
     '''

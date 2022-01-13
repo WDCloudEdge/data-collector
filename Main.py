@@ -7,5 +7,5 @@ import handler.Log as Log
 if __name__ == "__main__":
     config = Config()
     Metric.collect(config)
-    Trace.collect(config)
     Log.collect(config)
+    Trace.collect(config)

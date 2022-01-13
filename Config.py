@@ -10,7 +10,7 @@ class Config():
         self.svcs = set()
         self.pods = set()
         
-        # duration
+        # duration 默认前10分钟
         self.duration = 10 * 60
         self.start = int(round((time.time() - self.duration) * (10 ** 6)))
         self.end = int(round(time.time() * (10 ** 6)))
@@ -24,3 +24,6 @@ class Config():
         self.jaeger_url = 'http://121.4.170.179:15032/jaeger/api/traces?'
         self.lookBack = 'custom'
         self.limit = 1000
+
+        # kiali (log)
+        self.kiali_url = 'http://121.4.170.179:15029/kiali/api'
