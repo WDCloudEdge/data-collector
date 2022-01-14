@@ -21,9 +21,10 @@ class Config():
         self.step = 1
 
         # jarger
-        self.jaeger_url = 'http://121.4.170.179:15032/jaeger/api/traces?'
+        self.jaeger_url = 'http://121.4.170.179:15033/api/traces?'
         self.lookBack = 'custom'
-        self.limit = 1000
+        self.limit = 1000000
 
         # kiali (log)
         self.kiali_url = 'http://121.4.170.179:15029/kiali/api'
+        self.kiali_cookie = 'kiali-token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NDIyMzY3NTMsImlzcyI6ImtpYWxpLWxvZ2luIiwic3ViIjoiYWRtaW4ifQ.zcLtWk3IJBSzPkOM2p-H4cFyPRN7wzyFgWLgCRb9eS4; _ga=GA1.1.1033189754.1637066853; _xsrf=2|54022c23|8d9344a7bc8fe2db138db5f93a0d2c9e|1639745173'
