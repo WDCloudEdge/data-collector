@@ -54,7 +54,7 @@ def handle(trace_jsons):
     for trace_json in trace_jsons:
         # traceId
         trace_dict = {'traceId': trace_json['traceID'], 'call': [], 'timestamp': [], 'latency': [],
-                      'svcs': [], 'status_code': [], 'http_status': ''}
+                      'svcs': [], 'pods': [], 'status_code': [], 'http_status': ''}
         # processes
         processes = trace_json['processes']
         # 解析 span
@@ -64,7 +64,7 @@ def handle(trace_jsons):
         for span_json in trace_json['spans']:
             trace_dict['timestamp'].append(span_json['startTime'])
             trace_dict['latency'].append(span_json['duration'])
-            [trace_dict['svcs'].append(tag['value']) for tag in processes[span_json['processID']]['tags'] if tag['key'] == 'name']
+            trace_dict['svcs'].append(processes[span_json['processID']]['serviceName'])
             for tag in span_json['tags']:
                 if tag['key'] == 'status.code':
                     trace_dict['status_code'].append(tag['value'])
@@ -74,14 +74,14 @@ def handle(trace_jsons):
             for ref in span_json['references']:
                 try:
                     trace_dict['call'].append((
-                        get_pod_name(spans_dict[ref['spanID']], processes),
-                        get_pod_name(span_json, processes)
+                        processes[spans_dict[ref['spanID']]['processID']]['serviceName'],
+                        processes[span_json['processID']]['serviceName']
                     ))
                 except:
                     # 存在断链（未能接收到某个节点的span数据）
                     trace_dict['call'].append((
-                        None, span_json['operationName'].split('.')[0])
-                    )
+                        None, processes[span_json['processID']]['serviceName']
+                    ))
 
         traces_dict[trace_json['traceID']] = trace_dict
     return traces_dict

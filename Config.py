@@ -27,4 +27,4 @@ class Config():
 
         # kiali (log)
         self.kiali_url = 'http://121.4.170.179:15029/kiali/api'
-        self.kiali_cookie = 'kiali-token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NDIyMzY3NTMsImlzcyI6ImtpYWxpLWxvZ2luIiwic3ViIjoiYWRtaW4ifQ.zcLtWk3IJBSzPkOM2p-H4cFyPRN7wzyFgWLgCRb9eS4; _ga=GA1.1.1033189754.1637066853; _xsrf=2|54022c23|8d9344a7bc8fe2db138db5f93a0d2c9e|1639745173'
+        self.kiali_cookie = 'kiali-token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NDIzMjMyNzksImlzcyI6ImtpYWxpLWxvZ2luIiwic3ViIjoiYWRtaW4ifQ.QiSiSeMIGba2XmmBB2PjIGeDp-27Ucidy9RivT1G1_M; _ga=GA1.1.1033189754.1637066853; _xsrf=2|54022c23|8d9344a7bc8fe2db138db5f93a0d2c9e|1639745173; _gid=GA1.1.1582671738.1642151252'
