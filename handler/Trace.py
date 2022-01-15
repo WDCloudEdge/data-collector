@@ -53,25 +53,30 @@ def handle(trace_jsons):
     traces_dict = {}
     for trace_json in trace_jsons:
         # traceId
-        trace_dict = {'traceId': trace_json['traceID'], 'call': [], 'timestamp': [], 'latency': [], 'http_status': [],
-                      'svc': []}
+        trace_dict = {'traceId': trace_json['traceID'], 'call': [], 'timestamp': [], 'latency': [],
+                      'svcs': [], 'status_code': [], 'http_status': ''}
+        # processes
+        processes = trace_json['processes']
         # 解析 span
-
         spans_dict = {}
         for span_json in trace_json['spans']:
             spans_dict[span_json['spanID']] = span_json
         for span_json in trace_json['spans']:
             trace_dict['timestamp'].append(span_json['startTime'])
             trace_dict['latency'].append(span_json['duration'])
-            trace_dict['svc'].append(span_json['operationName'].split('.')[0])
-            [trace_dict['http_status'].append(tag['value']) for tag in span_json['tags'] if
-             tag['key'] == 'http.status_code']
+            [trace_dict['svcs'].append(tag['value']) for tag in processes[span_json['processID']]['tags'] if tag['key'] == 'name']
+            for tag in span_json['tags']:
+                if tag['key'] == 'status.code':
+                    trace_dict['status_code'].append(tag['value'])
+                elif tag['key'] == 'http.status_code':
+                    trace_dict['http_status'] = tag['value']
+
             for ref in span_json['references']:
                 try:
                     trace_dict['call'].append((
-                        spans_dict[ref['spanID']]['operationName'].split('.')[0],
-                        span_json['operationName'].split('.')[0])
-                    )
+                        get_pod_name(spans_dict[ref['spanID']], processes),
+                        get_pod_name(span_json, processes)
+                    ))
                 except:
                     # 存在断链（未能接收到某个节点的span数据）
                     trace_dict['call'].append((
@@ -80,3 +85,9 @@ def handle(trace_jsons):
 
         traces_dict[trace_json['traceID']] = trace_dict
     return traces_dict
+
+
+def get_pod_name(span_json, processes):
+    for tag in processes[span_json['processID']]['tags']:
+        if tag['key'] == 'name':
+            return tag['value']

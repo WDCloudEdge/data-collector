@@ -1,3 +1,5 @@
+import time
+
 from Config import Config
 import handler.Metric as Metric
 import handler.Trace as Trace
