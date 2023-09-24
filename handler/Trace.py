@@ -3,16 +3,15 @@ from Config import Config
 import pickle
 
 
-def collect(config: Config):
+def collect(config: Config, _dir: str):
     urls = build_trace_urls(config)
     traces_dict = {}
-    for url in urls:  
+    for url in urls:
         trace_dict = handle(pull(url))
         traces_dict = {**traces_dict, **trace_dict}
-    pipe_path='data/traces.pkl'
-    with open(pipe_path,'wb') as fw:
-        pickle.dump(list(traces_dict.values()),fw)
-       
+    pipe_path = _dir + '/' + 'traces.pkl'
+    with open(pipe_path, 'ab') as fw:
+        pickle.dump(list(traces_dict.values()), fw)
 
 
 def build_trace_urls(config: Config):
@@ -21,7 +20,8 @@ def build_trace_urls(config: Config):
     '''
     svcs = [svc + '.' + config.namespace for svc in config.svcs]
     urls = ['{}end={}&start={}&limit={}&lookback={}&maxDuration&minDuration&service={}' \
-            .format(config.jaeger_url, config.end, config.start, config.limit, config.lookBack, svc) for svc in svcs]           
+                .format(config.jaeger_url, config.end, config.start, config.limit, config.lookBack, svc) for svc in
+            svcs]
     return urls
     # windowsSize = 10
     # start = config.start
@@ -50,7 +50,7 @@ def handle(trace_jsons):
     '''
         处理原始trace文件
     '''
-    traces_dict ={}
+    traces_dict = {}
     for trace_json in trace_jsons:
         # traceId
         trace_dict = {'traceId': trace_json['traceID']}
@@ -68,11 +68,13 @@ def handle(trace_jsons):
             trace_dict['timestamp'].append(span_json['startTime'])
             trace_dict['latency'].append(span_json['duration'])
             trace_dict['svc'].append(span_json['operationName'].split('.')[0])
-            [trace_dict['http_status'].append(tag['value']) for tag in span_json['tags'] if tag['key'] == 'http.status_code']
+            [trace_dict['http_status'].append(tag['value']) for tag in span_json['tags'] if
+             tag['key'] == 'http.status_code']
             for ref in span_json['references']:
                 try:
                     trace_dict['call'].append((
-                        spans_dict[ref['spanID']]['operationName'].split('.')[0], span_json['operationName'].split('.')[0])
+                        spans_dict[ref['spanID']]['operationName'].split('.')[0],
+                        span_json['operationName'].split('.')[0])
                     )
                 except:
                     # 存在断链（未能接收到某个节点的span数据）
