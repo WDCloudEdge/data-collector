@@ -29,14 +29,14 @@ if __name__ == "__main__":
     folder = '.'
     data_folder = './data/' + config.namespace + '/' + str(config.user)
     min = 1
-    max = 7
+    max = 31
     for i in range(min, max):
         config.start = int(round((now_time - config.duration)))
         config.end = int(round(now_time))
         print('第' + str(i) + '次获取数据')
         MetricCollector.collect(config, data_folder)
         now_time += config.duration
-        config.pods.clear()
         # Trace.collect(config, data_folder)
+        config.pods.clear()
         # if i != max - 1:
         #     time.sleep(config.duration)

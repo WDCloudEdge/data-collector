@@ -19,7 +19,11 @@ def collect_graph(config: Config, _dir: str):
         destination = metric['destination_workload']
         config.svcs.add(source)
         config.svcs.add(destination)
-        graph_df = graph_df.append({'source': source, 'destination': destination}, ignore_index=True)
+        values = result['values']
+        values = list(zip(*values))
+        for timestamp in values[0]:
+            graph_df = graph_df.append({'source': source, 'destination': destination, 'timestamp': timestamp},
+                                       ignore_index=True)
 
     prom_sql = 'sum(container_cpu_usage_seconds_total{namespace=\"%s\", container!~\'POD|istio-proxy\'}) by (instance, pod)' % config.namespace
     results = prom_util.execute_prom(config.prom_range_url, prom_sql)
@@ -30,8 +34,14 @@ def collect_graph(config: Config, _dir: str):
             source = metric['pod']
             config.pods.add(source)
             destination = metric['instance']
-            graph_df = graph_df.append({'source': source, 'destination': destination}, ignore_index=True)
+            values = result['values']
+            values = list(zip(*values))
+            for timestamp in values[0]:
+                graph_df = graph_df.append({'source': source, 'destination': destination, 'timestamp': timestamp},
+                                           ignore_index=True)
 
+    graph_df['timestamp'] = graph_df['timestamp'].astype('datetime64[s]')
+    graph_df = graph_df.sort_values(by='timestamp', ascending=True)
     path = os.path.join(_dir, 'graph.csv')
     graph_df.to_csv(path, index=False, mode='a')
 
@@ -150,11 +160,11 @@ def collect_pod_num(config: Config, _dir: str):
     #         instance_df[name] = pd.Series(metric)
     #         instance_df[name] = instance_df[name].astype('float64')
     qps_sql = 'count(kube_pod_info{namespace="%s"}) by (created_by_name)' % config.namespace
-    response = prom_util.execute_prom(config.prom_range_url, qps_sql)
+    response = prom_util.execute_prom(config.prom_range_url_node, qps_sql)
 
     def handle(result, instance_df):
         if 'created_by_name' in result['metric']:
-            name = result['metric']['created_by_name'].split('-')[0] + '&count'
+            name = result['metric']['created_by_name'][:result['metric']['created_by_name'].rfind('-')] + '&count'
             values = result['values']
             values = list(zip(*values))
             if 'timestamp' not in instance_df:
@@ -285,6 +295,10 @@ def collect_node_metric(config: Config, _dir: str):
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
         values = list(zip(*values))
+        if 'timestamp' not in df:
+            timestamp = values[0]
+            df['timestamp'] = timestamp
+            df['timestamp'] = df['timestamp'].astype('datetime64[s]')
         metric = pd.Series(values[1])
         col_name = '(node)' + node + '_network'
         df[col_name] = metric

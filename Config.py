@@ -17,7 +17,7 @@ class Config:
         # duration
         self.duration = 10 * 60
         self.start = int(round((time.time() - self.duration)))
-        self.end = int(round(time.time())) - 60 * 60 * 6
+        self.end = int(round(time.time())) - 60 * 60 * 21
 
         # prometheus
         self.prom_range_url = "http://47.99.240.112:31444/api/v1/query_range"
@@ -26,7 +26,7 @@ class Config:
         self.step = 5
 
         # jarger
-        self.jaeger_url = 'http://47.99.200.176:14250/jaeger/api/traces?'
+        self.jaeger_url = 'http://47.99.200.176:14268/jaeger/api/traces?'
         self.lookBack = 'custom'
         self.limit = 1000
 

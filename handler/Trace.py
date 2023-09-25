@@ -18,9 +18,11 @@ def build_trace_urls(config: Config):
     '''
         构建每个服务每分钟的trace拉取路径（避免数据量太大）
     '''
-    svcs = [svc + '.' + config.namespace for svc in config.svcs]
+    svcs = [svc + '.' + config.namespace for svc in config.svcs if 'unknown' not in svc and 'redis' not in svc]
     urls = ['{}end={}&start={}&limit={}&lookback={}&maxDuration&minDuration&service={}' \
-                .format(config.jaeger_url, config.end, config.start, config.limit, config.lookBack, svc) for svc in
+                .format(config.jaeger_url, config.end * 1000000, config.start * 1000000, config.limit, config.lookBack,
+                        svc) for
+            svc in
             svcs]
     return urls
     # windowsSize = 10
