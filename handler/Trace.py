@@ -62,6 +62,7 @@ def handle(trace_jsons):
         trace_dict['latency'] = []
         trace_dict['http_status'] = []
         trace_dict['svc'] = []
+        trace_dict['call_instance'] = []
 
         spans_dict = {}
         for span_json in trace_json['spans']:
@@ -69,20 +70,49 @@ def handle(trace_jsons):
         for span_json in trace_json['spans']:
             trace_dict['timestamp'].append(span_json['startTime'])
             trace_dict['latency'].append(span_json['duration'])
-            trace_dict['svc'].append(span_json['operationName'].split('.')[0])
             [trace_dict['http_status'].append(tag['value']) for tag in span_json['tags'] if
              tag['key'] == 'http.status_code']
-            for ref in span_json['references']:
-                try:
-                    trace_dict['call'].append((
-                        spans_dict[ref['spanID']]['operationName'].split('.')[0],
-                        span_json['operationName'].split('.')[0])
-                    )
-                except:
-                    # 存在断链（未能接收到某个节点的span数据）
-                    trace_dict['call'].append((
-                        None, span_json['operationName'].split('.')[0])
-                    )
+            node_id = None
+            caller_svc = None
+            callee_svc = None
+            outbound_node_id = None
+            for tag in span_json['tags']:
+                if 'node_id' == tag['key']:
+                    node_id = tag['value']
+                if 'upstream_cluster' == tag['key']:
+                    if 'inbound' in tag['value']:
+                        for ref in span_json['references']:
+                            if ref['refType'] == 'CHILD_OF':
+                                outbound_span = spans_dict[ref['spanID']]
+                                for outbound_tag in outbound_span['tags']:
+                                    if 'node_id' == outbound_tag['key']:
+                                        outbound_node_id = outbound_tag['value']
+                                    if 'istio.canonical_service' == outbound_tag['key']:
+                                        caller_svc = outbound_tag['value']
+                if 'istio.canonical_service' == tag['key']:
+                    callee_svc = tag['value']
+            trace_dict['svc'].append(callee_svc)
+            if node_id is not None and outbound_node_id is not None:
+                trace_dict['call'].append((caller_svc, callee_svc))
+                trace_dict['call_instance'].append(
+                    (handle_istio_node_id(outbound_node_id), handle_istio_node_id(node_id)))
+                # try:
+                #     trace_dict['call'].append((
+                #         spans_dict[ref['spanID']]['operationName'].split('.')[0],
+                #         span_json['operationName'].split('.')[0])
+                #     )
+                # except:
+                #     # 存在断链（未能接收到某个节点的span数据）
+                #     trace_dict['call'].append((
+                #         None, span_json['operationName'].split('.')[0])
+                #     )
 
         traces_dict[trace_json['traceID']] = trace_dict
     return traces_dict
+
+
+def handle_istio_node_id(node_id: str) -> str:
+    s = node_id.split('~')
+    if len(s) != 4:
+        raise Exception('istio trace node id illegal')
+    return s[2] + '-' + s[1]

@@ -3,7 +3,7 @@ import time
 
 class Config:
     def __init__(self):
-        self.namespace = 'bookinfo'
+        self.namespace = 'hipster'
         self.nodes = {
             'master': 'izbp193ioajdcnpofhlr1hz',
             'cloud-worker1': 'izbp1gwb52uyj3g0wn52lez',
@@ -17,7 +17,7 @@ class Config:
         # duration
         self.duration = 10 * 60
         self.start = int(round((time.time() - self.duration)))
-        self.end = int(round(time.time())) - 60 * 60 * 21
+        self.end = int(round(time.time())) - 60 * 60 * 24
 
         # prometheus
         self.prom_range_url = "http://47.99.240.112:31444/api/v1/query_range"
@@ -26,8 +26,8 @@ class Config:
         self.step = 5
 
         # jarger
-        self.jaeger_url = 'http://47.99.200.176:14268/jaeger/api/traces?'
-        self.lookBack = 'custom'
+        self.jaeger_url = 'http://47.99.200.176:16686/api/traces?'
+        self.lookBack = str(int(self.duration / 60)) + 'm'
         self.limit = 1000
 
         # kubernetes
