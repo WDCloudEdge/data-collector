@@ -7,36 +7,25 @@ import MetricCollector
 from handler import Trace
 
 if __name__ == "__main__":
-    # config = Config()
-    # duration = 60
-    # now_time = time.time()
-    # folder = '.'
-    # fault_type = 'memory-cartservice-8444494f87-868qq'
-    # min = 1
-    # max = 11
-    # for i in range(min, max):
-    #     config.start = int(round((now_time - duration) * (10 ** 6)))
-    #     config.end = int(round(now_time * (10 ** 6)))
-    #     print('第' + str(i) +'次获取数据')
-    #     Metric.collect(config, fault_type, i)
-    #     now_time += duration
-    #     if i != max - 1: time.sleep(duration)
-    # Metric.collect(config)
-    # Trace.collect(config)
-    # Log.collect(config)
+    namespaces = ['bookinfo', 'hipster', 'hipster2', 'sock-shop', 'horsecoder-test', 'horsecoder-minio']
     config = Config()
-    now_time = config.end
+    global_now_time = 1697777100
+    global_end_time = 1697777100
     folder = '.'
-    data_folder = './data/' + config.namespace + '/' + str(config.user)
-    min = 1
-    max = 2
-    for i in range(min, max):
-        config.start = int(round((now_time - config.duration)))
-        config.end = int(round(now_time))
-        print('第' + str(i) + '次获取数据')
-        MetricCollector.collect(config, data_folder)
-        now_time += config.duration
-        Trace.collect(config, data_folder)
+    for _, n in namespaces:
+        config.namespace = n
+        config.svcs.clear()
         config.pods.clear()
-        # if i != max - 1:
-        #     time.sleep(config.duration)
+        count = 1
+        now_time = global_now_time
+        end_time = global_end_time
+        data_folder = './data/' + config.namespace + '/' + str(config.user)
+        while now_time < end_time:
+            config.start = int(round(now_time))
+            config.end = int(round(now_time + config.duration))
+            print('第' + str(count) + '次获取 [' + config.namespace + '] 数据')
+            MetricCollector.collect(config, data_folder)
+            now_time += config.duration + 1
+            Trace.collect(config, data_folder)
+            config.pods.clear()
+            count += 1
