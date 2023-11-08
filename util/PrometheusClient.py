@@ -13,6 +13,7 @@ class PrometheusClient:
         self.namespace = config.namespace
         self.prom_no_range_url = config.prom_no_range_url
         self.prom_range_url = config.prom_range_url
+        self.prom_range_url_node = config.prom_range_url_node
         self.start = config.start
         self.end = config.end
         self.step = config.step
@@ -65,7 +66,7 @@ class PrometheusClient:
 
     def get_call_latency(self):
         prom_url = self.prom_no_range_url
-        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, source_workload, le))' % self.namespace
+        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[10s])) by (destination_workload, source_workload, le))' % self.namespace
         responses_90 = self.execute_prom(prom_url, prom_90_sql)
 
         call_latencies = {}
@@ -81,9 +82,9 @@ class PrometheusClient:
     def get_svc_latency(self):
         # p50,p90,p99
         prom_url = self.prom_no_range_url
-        prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, le))' % self.namespace
-        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, le))' % self.namespace
-        prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, le))' % self.namespace
+        prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[10s])) by (destination_workload, le))' % self.namespace
+        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[10s])) by (destination_workload, le))' % self.namespace
+        prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[10s])) by (destination_workload, le))' % self.namespace
 
         responses_50 = self.execute_prom(prom_url, prom_50_sql)
         responses_90 = self.execute_prom(prom_url, prom_90_sql)
@@ -111,7 +112,7 @@ class PrometheusClient:
 
     def get_svc_qps(self):
         qps_dic = {}
-        qps_sql = 'sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[1m])) by (destination_workload)' % self.namespace
+        qps_sql = 'sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[10s])) by (destination_workload)' % self.namespace
         response = self.execute_prom(self.prom_no_range_url, qps_sql)
 
         if len(response) > 0:
@@ -124,7 +125,7 @@ class PrometheusClient:
 
     def get_call_p90_latency_range(self):
         call_df = pd.DataFrame()
-        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, source_workload, le))' % self.namespace
+        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[10s])) by (destination_workload, destination_workload_namespace, source_workload, le))' % self.namespace
         responses_90 = self.execute_prom(self.prom_range_url, prom_90_sql)
 
         def handle(result, call_df, type):
@@ -146,7 +147,7 @@ class PrometheusClient:
 
     def get_svc_p90_latency_range(self):
         latency_df = pd.DataFrame()
-        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, le))' % self.namespace
+        prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[10s])) by (destination_workload, destination_workload_namespace, le))' % self.namespace
         responses_90 = self.execute_prom(self.prom_range_url, prom_90_sql)
 
         def handle(result, latency_df):
@@ -168,8 +169,8 @@ class PrometheusClient:
 
     def get_resource_metric_range(self):
         metric_df = pd.DataFrame()
-        vCPU_sql = 'sum(rate(container_cpu_usage_seconds_total{job="kubernetes-cadvisor",container!~\'POD|istio-proxy|\',namespace="%s"}[1m]))' % self.namespace
-        mem_sql = 'sum(rate(container_memory_usage_bytes{job="kubernetes-cadvisor",container!~\'POD|istio-proxy|\', namespace="%s"}[1m])) / (1024*1024)' % self.namespace
+        vCPU_sql = 'sum(rate(container_cpu_usage_seconds_total{job="kubernetes-cadvisor",container!~\'POD|istio-proxy|\',namespace="%s"}[10s]))' % self.namespace
+        mem_sql = 'sum(rate(container_memory_usage_bytes{job="kubernetes-cadvisor",container!~\'POD|istio-proxy|\', namespace="%s"}[10s])) / (1024*1024)' % self.namespace
         vCPU = self.execute_prom(self.prom_range_url, vCPU_sql)
         mem = self.execute_prom(self.prom_range_url, mem_sql)
 
@@ -193,7 +194,7 @@ class PrometheusClient:
     # Get qps for microservices
     def get_svc_qps_range(self):
         qps_df = pd.DataFrame()
-        qps_sql = 'sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[1m])) by (destination_workload)' % self.namespace
+        qps_sql = 'sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[30s])) by (destination_workload)' % self.namespace
         response = self.execute_prom(self.prom_range_url, qps_sql)
 
         def handle(result, qps_df):
@@ -240,16 +241,16 @@ class PrometheusClient:
         net_trainsmit_sql = 'sum(rate(container_network_transmit_bytes_total{namespace="%s"}[1m])) by (pod) / 1024' % (
             self.namespace)
 
-        cpu_usage = self.execute_prom(self.prom_range_url, cpu_usage_sql)
-        cpu_limit = self.execute_prom(self.prom_range_url, cpu_limit_sql)
-        mem_usage_rate = self.execute_prom(self.prom_range_url, mem_usage_rate_sql)
-        mem_usage = self.execute_prom(self.prom_range_url, mem_usage_sql)
-        mem_limit = self.execute_prom(self.prom_range_url, mem_limit_sql)
-        fs_usage = self.execute_prom(self.prom_range_url, fs_usage_sql)
-        fs_write = self.execute_prom(self.prom_range_url, fs_write_sql)
-        fs_read = self.execute_prom(self.prom_range_url, fs_read_sql)
-        net_receive = self.execute_prom(self.prom_range_url, net_receive_sql)
-        net_trainsmit = self.execute_prom(self.prom_range_url, net_trainsmit_sql)
+        cpu_usage = self.execute_prom(self.prom_range_url_node, cpu_usage_sql)
+        cpu_limit = self.execute_prom(self.prom_range_url_node, cpu_limit_sql)
+        mem_usage_rate = self.execute_prom(self.prom_range_url_node, mem_usage_rate_sql)
+        mem_usage = self.execute_prom(self.prom_range_url_node, mem_usage_sql)
+        mem_limit = self.execute_prom(self.prom_range_url_node, mem_limit_sql)
+        fs_usage = self.execute_prom(self.prom_range_url_node, fs_usage_sql)
+        fs_write = self.execute_prom(self.prom_range_url_node, fs_write_sql)
+        fs_read = self.execute_prom(self.prom_range_url_node, fs_read_sql)
+        net_receive = self.execute_prom(self.prom_range_url_node, net_receive_sql)
+        net_trainsmit = self.execute_prom(self.prom_range_url_node, net_trainsmit_sql)
 
         # indexs = []
         # for i in range(self.config.start, self.config.end + 1):
@@ -267,6 +268,7 @@ class PrometheusClient:
             tempdf = pd.DataFrame()
             tempdf['timestamp'] = values[0]
             tempdf[name] = pd.Series(metric)
+            tempdf[name] = tempdf[name].fillna(0)
             tempdf[name] = tempdf[name].astype('float64')
             tempdf.set_index('timestamp', inplace=True)
             tempdfs.append(tempdf)

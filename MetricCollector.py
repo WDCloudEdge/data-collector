@@ -52,9 +52,9 @@ def collect_call_latency(config: Config, _dir: str):
 
     prom_util = PrometheusClient(config)
     # P50，P90，P99
-    prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
-    prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
-    prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
+    prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[30s])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
+    prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[30s])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
+    prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[30s])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
     responses_50 = prom_util.execute_prom(config.prom_range_url, prom_50_sql)
     responses_90 = prom_util.execute_prom(config.prom_range_url, prom_90_sql)
     responses_99 = prom_util.execute_prom(config.prom_range_url, prom_99_sql)
@@ -70,6 +70,7 @@ def collect_call_latency(config: Config, _dir: str):
         metric = values[1]
         key = name + '&' + type
         call_df[key] = pd.Series(metric)
+        call_df[key] = call_df[key].fillna(0)
         call_df[key] = call_df[key].astype('float64')
 
     [handle(result, call_df, 'p50') for result in responses_50]
@@ -104,6 +105,7 @@ def collect_svc_latency(config: Config, _dir: str):
         metric = values[1]
         key = name + '&' + type
         latency_df[key] = pd.Series(metric)
+        latency_df[key] = latency_df[key].fillna(0)
         latency_df[key] = latency_df[key].astype('float64')
 
     [handle(result, latency_df, 'p50') for result in responses_50]
@@ -120,8 +122,8 @@ def collect_resource_metric(config: Config, _dir: str):
     vCPU_sql = 'sum(rate(container_cpu_usage_seconds_total{image!="",namespace="%s"}[1m]))' % config.namespace
     mem_sql = 'sum(rate(container_memory_usage_bytes{image!="",namespace="%s"}[1m])) / (1024*1024)' % config.namespace
     prom_util = PrometheusClient(config)
-    vCPU = prom_util.execute_prom(config.prom_range_url, vCPU_sql)
-    mem = prom_util.execute_prom(config.prom_range_url, mem_sql)
+    vCPU = prom_util.execute_prom(config.prom_range_url_node, vCPU_sql)
+    mem = prom_util.execute_prom(config.prom_range_url_node, mem_sql)
 
     def handle(result, metric_df, col):
         values = result['values']
@@ -173,6 +175,7 @@ def collect_pod_num(config: Config, _dir: str):
                 instance_df['timestamp'] = instance_df['timestamp'].astype('datetime64[s]')
             metric = values[1]
             instance_df[name] = pd.Series(metric)
+            instance_df[name] = instance_df[name].fillna(0)
             instance_df[name] = instance_df[name].astype('float64')
 
     [handle(result, instance_df) for result in response]
@@ -185,7 +188,7 @@ def collect_pod_num(config: Config, _dir: str):
 def collect_svc_qps(config: Config, _dir: str):
     qps_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
-    qps_sql = 'sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[1m])) by (destination_workload)' % config.namespace
+    qps_sql = 'sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[30s])) by (destination_workload)' % config.namespace
     response = prom_util.execute_prom(config.prom_range_url, qps_sql)
 
     def handle(result, qps_df):
@@ -198,6 +201,7 @@ def collect_svc_qps(config: Config, _dir: str):
             qps_df['timestamp'] = qps_df['timestamp'].astype('datetime64[s]')
         metric = values[1]
         qps_df[name] = pd.Series(metric)
+        qps_df[name] = qps_df[name].fillna(0)
         qps_df[name] = qps_df[name].astype('float64')
 
     [handle(result, qps_df) for result in response]
@@ -220,13 +224,13 @@ def collect_ctn_metric(config: Config, _dir: str):
     prom_util = PrometheusClient(config)
     prom_cpu_sql = 'sum(rate(container_cpu_usage_seconds_total{namespace=\'%s\',container!~\'POD|istio-proxy|\',pod!~\'jaeger.*\'}[1m])* 1000)  by (pod, instance,container)' % config.namespace
 
-    response = prom_util.execute_prom(config.prom_range_url, prom_cpu_sql)
+    response = prom_util.execute_prom(config.prom_range_url_node, prom_cpu_sql)
     for result in response:
         pod_name = result['metric']['pod']
         prom_memory_sql = 'sum(container_memory_working_set_bytes{namespace=\'%s\',pod="%s"}) by(pod, instance)  / 1000000' % (
             config.namespace, pod_name)
         prom_network_sql = 'sum(rate(container_network_transmit_packets_total{namespace=\"%s\", pod="%s"}[1m])) * sum(rate(container_network_transmit_packets_total{namespace=\"%s\", pod="%s"}[1m]))' % (
-            config.namespace, pod_name, config.namespace, pod_name),
+            config.namespace, pod_name, config.namespace, pod_name)
 
         config.pods.add(pod_name)
         values = result['values']
@@ -240,7 +244,7 @@ def collect_ctn_metric(config: Config, _dir: str):
         df[col_name] = metric
         df[col_name] = df[col_name].astype('float64')
 
-        response = prom_util.execute_prom(config.prom_range_url, prom_memory_sql)
+        response = prom_util.execute_prom(config.prom_range_url_node, prom_memory_sql)
         values = response[0]['values']
         values = list(zip(*values))
         metric = pd.Series(values[1])
@@ -248,7 +252,7 @@ def collect_ctn_metric(config: Config, _dir: str):
         df[col_name] = metric
         df[col_name] = df[col_name].astype('float64')
 
-        response = prom_util.execute_prom(config.prom_range_url, prom_network_sql)
+        response = prom_util.execute_prom(config.prom_range_url_node, prom_network_sql)
         values = response[0]['values']
         values = list(zip(*values))
         metric = pd.Series(values[1])
@@ -291,7 +295,7 @@ def collect_node_metric(config: Config, _dir: str):
     df = pd.DataFrame()
     prom_util = PrometheusClient(config)
     for node in config.nodes.values():
-        prom_sql = 'rate(node_network_transmit_packets_total{device="cni0", instance="%s"}[1m]) / 1000' % node
+        prom_sql = 'rate(node_network_transmit_packets_total{device="cni0", instance="%s"}[30s]) / 1000' % node
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
         values = list(zip(*values))
@@ -304,7 +308,21 @@ def collect_node_metric(config: Config, _dir: str):
         df[col_name] = metric
         df[col_name] = df[col_name].astype('float64')
 
-        prom_sql = '1-(sum(increase(node_cpu_seconds_total{instance="%s",mode="idle"}[1m]))/sum(increase(node_cpu_seconds_total{instance="%s"}[1m])))' % (
+        prom_sql = 'rate(node_network_transmit_packets_total{device="raven0", instance="%s"}[3m]) / 1000' % node
+        response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
+        values = response[0]['values']
+        values = list(zip(*values))
+        if 'timestamp' not in df:
+            timestamp = values[0]
+            df['timestamp'] = timestamp
+            df['timestamp'] = df['timestamp'].astype('datetime64[s]')
+        metric = pd.Series(values[1])
+        col_name = '(node)' + node + '_edge_network'
+        df[col_name] = metric
+        df[col_name] = df[col_name].fillna(0)
+        df[col_name] = df[col_name].astype('float64')
+
+        prom_sql = '1-(sum(increase(node_cpu_seconds_total{instance="%s",mode="idle"}[1m]))/sum(increase(node_cpu_seconds_total{instance="%s"}[30s])))' % (
             node, node)
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
@@ -342,5 +360,10 @@ def collect(config: Config, _dir: str):
     collect_svc_qps(config, _dir)
     collect_svc_metric(config, _dir)
     collect_pod_num(config, _dir)
-    collect_node_metric(config, _dir)
     collect_ctn_metric(config, _dir)
+
+def collect_node(config: Config, _dir: str):
+    print('collect node metrics')
+    if not os.path.exists(_dir):
+        os.makedirs(_dir)
+    collect_node_metric(config, _dir)

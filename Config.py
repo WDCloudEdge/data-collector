@@ -17,7 +17,7 @@ class Config:
         self.svcs = set()
         self.pods = set()
 
-        self.interval = 1
+        self.interval = 10 * 60
         # duration related to interval
         self.duration = self.interval
         self.start = int(round((time.time() - self.duration)))
@@ -27,16 +27,15 @@ class Config:
         self.prom_range_url = "http://47.99.240.112:31444/api/v1/query_range"
         self.prom_range_url_node = "http://47.99.240.112:31222/api/v1/query_range"
         self.prom_no_range_url = "http://47.99.240.112:31444/api/v1/query"
-        # step related to interval
-        self.step = self.interval
+        self.step = 5
 
         # jarger
         self.jaeger_url = 'http://47.99.200.176:16686/api/traces?'
         self.lookBack = str(int(self.duration / 60)) + 'm'
-        self.limit = 1000
+        self.limit = 100000
 
         # kubernetes
         self.k8s_config = 'local-config'
 
         # concurrency set
-        self.user = '100-hybrid'
+        self.user = '20user-hybrid'

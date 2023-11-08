@@ -18,7 +18,14 @@ def build_trace_urls(config: Config):
     '''
         构建每个服务每分钟的trace拉取路径（避免数据量太大）
     '''
-    svcs = [svc + '.' + config.namespace for svc in config.svcs if 'unknown' not in svc and 'redis' not in svc]
+    if 'bookinfo' == config.namespace:
+        config.svcs.remove('reviews-v1')
+        config.svcs.remove('reviews-v2')
+        config.svcs.remove('reviews-v3')
+        config.svcs.add('reviews')
+        svcs = [svc + '.' + config.namespace for svc in config.svcs if 'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
+    else:
+        svcs = [svc + '.' + config.namespace for svc in config.svcs if 'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
     urls = ['{}end={}&start={}&limit={}&lookback={}&maxDuration&minDuration&service={}' \
                 .format(config.jaeger_url, config.end * 1000000, config.start * 1000000, config.limit, config.lookBack,
                         svc) for
@@ -72,6 +79,7 @@ def handle(trace_jsons):
             trace_dict['latency'].append(span_json['duration'])
             [trace_dict['http_status'].append(tag['value']) for tag in span_json['tags'] if
              tag['key'] == 'http.status_code']
+            # todo 解决UNKNOWN问题
             node_id = None
             caller_svc = None
             callee_svc = None
