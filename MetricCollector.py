@@ -52,9 +52,9 @@ def collect_call_latency(config: Config, _dir: str):
 
     prom_util = PrometheusClient(config)
     # P50，P90，P99
-    prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[30s])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
-    prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[30s])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
-    prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[30s])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
+    prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
+    prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
+    prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, source_workload, le))' % config.namespace
     responses_50 = prom_util.execute_prom(config.prom_range_url, prom_50_sql)
     responses_90 = prom_util.execute_prom(config.prom_range_url, prom_90_sql)
     responses_99 = prom_util.execute_prom(config.prom_range_url, prom_99_sql)
@@ -87,9 +87,9 @@ def collect_svc_latency(config: Config, _dir: str):
 
     prom_util = PrometheusClient(config)
     # P50，P90，P99
-    prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, le))' % config.namespace
-    prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, le))' % config.namespace
-    prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{reporter=\"destination\", destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, le))' % config.namespace
+    prom_50_sql = 'histogram_quantile(0.50, sum(irate(istio_request_duration_milliseconds_bucket{destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, le))' % config.namespace
+    prom_90_sql = 'histogram_quantile(0.90, sum(irate(istio_request_duration_milliseconds_bucket{destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, le))' % config.namespace
+    prom_99_sql = 'histogram_quantile(0.99, sum(irate(istio_request_duration_milliseconds_bucket{destination_workload_namespace=\"%s\"}[1m])) by (destination_workload, destination_workload_namespace, le))' % config.namespace
     responses_50 = prom_util.execute_prom(config.prom_range_url, prom_50_sql)
     responses_90 = prom_util.execute_prom(config.prom_range_url, prom_90_sql)
     responses_99 = prom_util.execute_prom(config.prom_range_url, prom_99_sql)
@@ -295,7 +295,7 @@ def collect_node_metric(config: Config, _dir: str):
     df = pd.DataFrame()
     prom_util = PrometheusClient(config)
     for node in config.nodes.values():
-        prom_sql = 'rate(node_network_transmit_packets_total{device="cni0", instance="%s"}[30s]) / 1000' % node
+        prom_sql = 'rate(node_network_transmit_packets_total{device="cni0", instance="%s"}[1m]) / 1000' % node
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
         values = list(zip(*values))

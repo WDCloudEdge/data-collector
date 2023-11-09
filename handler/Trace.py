@@ -79,7 +79,6 @@ def handle(trace_jsons):
             trace_dict['latency'].append(span_json['duration'])
             [trace_dict['http_status'].append(tag['value']) for tag in span_json['tags'] if
              tag['key'] == 'http.status_code']
-            # todo 解决UNKNOWN问题
             node_id = None
             caller_svc = None
             callee_svc = None
@@ -97,6 +96,10 @@ def handle(trace_jsons):
                                         outbound_node_id = outbound_tag['value']
                                     if 'istio.canonical_service' == outbound_tag['key']:
                                         caller_svc = outbound_tag['value']
+                                        if caller_svc == 'unknown':
+                                            caller_svc = 'istio-ingressgateway'
+                    # 找到只有outbound或inbound的span，则为系统交界区
+
                 if 'istio.canonical_service' == tag['key']:
                     callee_svc = tag['value']
             trace_dict['svc'].append(callee_svc)
