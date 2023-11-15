@@ -26,7 +26,7 @@ def collect_graph(config: Config, _dir: str):
                                        ignore_index=True)
 
     prom_sql = 'sum(container_cpu_usage_seconds_total{namespace=\"%s\", container!~\'POD|istio-proxy\'}) by (instance, pod)' % config.namespace
-    results = prom_util.execute_prom(config.prom_range_url, prom_sql)
+    results = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
 
     for result in results:
         metric = result['metric']
