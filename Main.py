@@ -1,12 +1,22 @@
+import sys
 from Config import Config
 import MetricCollector
 from handler import Trace
+import time
 
 if __name__ == "__main__":
-    namespaces = ['bookinfo', 'hipster', 'hipster2', 'sock-shop', 'horsecoder-test', 'horsecoder-minio']
+    # namespaces = ['bookinfo', 'hipster', 'hipster2', 'sock-shop', 'horsecoder-test', 'horsecoder-minio']
+    namespaces = ['bookinfo']
     config = Config()
-    global_now_time = 1699411200
-    global_end_time = 1699420800
+
+    global_now_time = 1700289600
+    global_end_time = 1700290200
+    now = int(time.time())
+    if global_now_time > now:
+        sys.exit("begin time is after now time")
+    if global_end_time > now:
+        global_end_time = now
+
     folder = '.'
     for n in namespaces:
         config.namespace = n

@@ -4,16 +4,16 @@ import time
 class Config:
     def __init__(self):
         self.namespace = 'bookinfo'
-        self.nodes = {
-            'master': 'izbp193ioajdcnpofhlr1hz',
-            'cloud-worker1': 'izbp1gwb52uyj3g0wn52lez',
-            'cloud-worker2': 'izbp1gwb52uyj3g0wn52lfz',
-            'cloud-worker3': 'izbp16opgy3xucvexwqp9dz',
-            'edge-worker1': 'server-1',
-            'edge-worker2': 'server-2',
-            'edge-worker3': 'server-3',
-            'edge-worker4': 'dell2018',
-        }
+        self.nodes = [
+            Node('master', '172.26.146.178', 'izbp193ioajdcnpofhlr1hz'),
+            Node('cloud-worker1', '172.26.146.180', 'izbp1gwb52uyj3g0wn52lez'),
+            Node('cloud-worker2', '172.26.146.179', 'izbp1gwb52uyj3g0wn52lfz'),
+            Node('cloud-worker3', '172.23.182.14', 'izbp16opgy3xucvexwqp9dz'),
+            Node('edge-worker1', '192.168.31.74', 'server-1'),
+            Node('edge-worker2', '192.168.31.85', 'server-2'),
+            Node('edge-worker3', '192.168.31.128', 'server-3'),
+            Node('edge-worker4', '192.168.31.208', 'dell2018')
+        ]
         self.svcs = set()
         self.pods = set()
 
@@ -38,4 +38,11 @@ class Config:
         self.k8s_config = 'local-config'
 
         # concurrency set
-        self.user = '20user-hybrid'
+        self.user = '20user-hybrid-20231118'
+
+
+class Node:
+    def __init__(self, name, ip, node_name):
+        self.name = name
+        self.ip = ip
+        self.node_name = node_name
