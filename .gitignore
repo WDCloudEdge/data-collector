@@ -4,6 +4,10 @@
 /.settings/
 /.vscode/
 /bin/
+__pycache__/
+handler/__pycache__/
+util/__pycache__/
+
 
 .classpath
 .project
