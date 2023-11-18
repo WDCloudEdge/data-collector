@@ -382,29 +382,50 @@ class PrometheusClient:
         net_receive = self.execute_prom(self.prom_no_range_url, net_receive_sql)
         net_trainsmit = self.execute_prom(self.prom_no_range_url, net_trainsmit_sql)
 
-        def handle(result, df, col):
+        def handle(result, dataframe, col):
             name = result['metric']['pod'] + '&' + col
             values = result['value']
-            if 'timestamp' not in df:
-                timestamp = values[0]
-                df['timestamp'] = timestamp
-                df['timestamp'] = df['timestamp'].astype('datetime64[s]')
+            container_df = pd.DataFrame()
+            timestamp = values[0]
+            container_df['timestamp'] = timestamp
+            container_df['timestamp'] = container_df['timestamp'].astype('datetime64[s]')
             metric = values[1]
-            df[name] = pd.Series(metric)
-            df[name] = df[name].astype('float64')
+            container_df[name] = pd.Series(metric)
+            container_df[name] = container_df[name].astype('float64')
+            dataframe = pd.merge(dataframe, container_df, on='timestamp', how='outer')
+            dataframe = dataframe.fillna(0)
+            return dataframe
 
-        [handle(result, df, 'cpu_usage') for result in cpu_usage]
-        [handle(result, df, 'cpu_limit') for result in cpu_limit]
-        [handle(result, df, 'mem_usage') for result in mem_usage]
-        [handle(result, df, 'mem_usage_rate') for result in mem_usage_rate]
-        [handle(result, df, 'mem_limit') for result in mem_limit]
-        [handle(result, df, 'fs_usage') for result in fs_usage]
-        [handle(result, df, 'fs_write') for result in fs_write]
-        [handle(result, df, 'fs_read') for result in fs_read]
-        [handle(result, df, 'net_receive') for result in net_receive]
-        [handle(result, df, 'net_trainsmit') for result in net_trainsmit]
-
-        df = df.fillna(0)
+        for result in cpu_usage:
+            df = handle(result, df, 'cpu_usage')
+            df = df.fillna(0)
+        for result in cpu_limit:
+            df = handle(result, df, 'cpu_limit')
+            df = df.fillna(0)
+        for result in mem_usage:
+            df = handle(result, df, 'mem_usage')
+            df = df.fillna(0)
+        for result in mem_usage_rate:
+            df = handle(result, df, 'mem_usage_rate')
+            df = df.fillna(0)
+        for result in mem_limit:
+            df = handle(result, df, 'mem_limit')
+            df = df.fillna(0)
+        for result in fs_usage:
+            df = handle(result, df, 'fs_usage')
+            df = df.fillna(0)
+        for result in fs_write:
+            df = handle(result, df, 'fs_write')
+            df = df.fillna(0)
+        for result in fs_read:
+            df = handle(result, df, 'fs_read')
+            df = df.fillna(0)
+        for result in net_receive:
+            df = handle(result, df, 'net_receive')
+            df = df.fillna(0)
+        for result in net_trainsmit:
+            df = handle(result, df, 'net_trainsmit')
+            df = df.fillna(0)
 
         # aggregation
         final_df = pd.DataFrame()
