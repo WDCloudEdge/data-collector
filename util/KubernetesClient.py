@@ -69,5 +69,12 @@ class KubernetesClient:
         body = {'spec': {'replicas': count}}
         self.apps_api.patch_namespaced_deployment_scale(svc, self.namespace, body)
 
+    def get_svc_list_name(self):
+        result = []
+        responses = self.core_api.list_namespaced_service(self.namespace)
+        for i in responses.items:
+            result.append(i.metadata.name)
+        return result
+
     # def update_yaml(self):
     #     os.system('kubectl apply -f %s > temp.log' % self.k8s_yaml)

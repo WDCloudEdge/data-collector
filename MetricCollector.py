@@ -2,6 +2,7 @@ import os
 import Config
 import pandas as pd
 from util.PrometheusClient import PrometheusClient
+from util.KubernetesClient import KubernetesClient
 
 
 def collect_graph(config: Config, _dir: str):
@@ -17,16 +18,17 @@ def collect_graph(config: Config, _dir: str):
         metric = result['metric']
         source = metric['source_workload']
         destination = metric['destination_workload']
-        config.svcs.add(source)
-        config.svcs.add(destination)
+        # config.svcs.add(source)
+        # config.svcs.add(destination)
+        config.svcs = KubernetesClient(config).get_svc_list_name()
         values = result['values']
         values = list(zip(*values))
         for timestamp in values[0]:
-            graph_df = graph_df.append({'source': source, 'destination': destination, 'timestamp': timestamp},
-                                       ignore_index=True)
+            new_row = pd.DataFrame({'source': [source], 'destination': [destination], 'timestamp': [timestamp]})
+            graph_df = pd.concat([graph_df, new_row], ignore_index=True)
 
     prom_sql = 'sum(container_cpu_usage_seconds_total{namespace=\"%s\", container!~\'POD|istio-proxy\'}) by (instance, pod)' % config.namespace
-    results = prom_util.execute_prom(config.prom_range_url, prom_sql)
+    results = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
 
     for result in results:
         metric = result['metric']
@@ -37,8 +39,10 @@ def collect_graph(config: Config, _dir: str):
             values = result['values']
             values = list(zip(*values))
             for timestamp in values[0]:
-                graph_df = graph_df.append({'source': source, 'destination': destination, 'timestamp': timestamp},
-                                           ignore_index=True)
+                new_row = pd.DataFrame({'source': [source], 'destination': [destination], 'timestamp': [timestamp]})
+                graph_df = pd.concat([graph_df, new_row], ignore_index=True)
+                # graph_df = graph_df.append({'source': source, 'destination': destination, 'timestamp': timestamp},
+                                           # ignore_index=True)
 
     graph_df['timestamp'] = graph_df['timestamp'].astype('datetime64[s]')
     graph_df = graph_df.sort_values(by='timestamp', ascending=True)
@@ -148,7 +152,7 @@ def collect_resource_metric(config: Config, _dir: str):
 def collect_pod_num(config: Config, _dir: str):
     instance_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
-    # qps_sql = 'count(container_cpu_usage_seconds_total{namespace="%s", container!~"POD|istio-proxy"}) by (container)' % (config.namespace)
+    # qps_sql = 'count(container_cpu_usage_seconds_total{namespace="%s", container!~"POD|istio-proxy"}) by (container)' % (config.yaml.namespace)
     # def handle(result, instance_df):
     #     if 'container' in result['metric']:
     #         name = result['metric']['container'] + '&count'
@@ -297,6 +301,9 @@ def collect_node_metric(config: Config, _dir: str):
     for node in config.nodes.values():
         prom_sql = 'rate(node_network_transmit_packets_total{device="cni0", instance="%s"}[1m]) / 1000' % node
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
+        # 改动
+        if response == []:
+            return
         values = response[0]['values']
         values = list(zip(*values))
         if 'timestamp' not in df:
@@ -350,8 +357,10 @@ def collect_node_metric(config: Config, _dir: str):
 
 def collect(config: Config, _dir: str):
     print('collect metrics')
+    # 建立文件夹
     if not os.path.exists(_dir):
         os.makedirs(_dir)
+    # 收集各种数据
     collect_graph(config, _dir)
     collect_call_latency(config, _dir)
     collect_svc_latency(config, _dir)
