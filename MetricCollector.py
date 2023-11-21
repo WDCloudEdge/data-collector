@@ -332,48 +332,76 @@ def collect_node_metric(config: Config, _dir: str):
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
         values = list(zip(*values))
-        if 'timestamp' not in df:
-            timestamp = values[0]
-            df['timestamp'] = timestamp
-            df['timestamp'] = df['timestamp'].astype('datetime64[s]')
+        timestamp = values[0]
+        node_df = pd.DataFrame()
+        node_df['timestamp'] = timestamp
+        node_df['timestamp'] = node_df['timestamp'].astype('datetime64[s]')
         metric = pd.Series(values[1])
         col_name = '(node)' + node.name + '_network'
-        df[col_name] = metric
-        df[col_name] = df[col_name].astype('float64')
+        node_df[col_name] = metric
+        node_df[col_name] = node_df[col_name].astype('float64')
+        node_df = node_df.fillna(0)
+        if df.empty:
+            df = node_df
+        else:
+            df = pd.merge(df, node_df, on='timestamp', how='outer')
+        df = df.fillna(0)
 
         prom_sql = 'rate(node_network_transmit_packets_total{device="raven0", instance="%s"}[3m]) / 1000' % node.node_name
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
         values = list(zip(*values))
-        if 'timestamp' not in df:
-            timestamp = values[0]
-            df['timestamp'] = timestamp
-            df['timestamp'] = df['timestamp'].astype('datetime64[s]')
+        node_df = pd.DataFrame()
+        node_df['timestamp'] = timestamp
+        node_df['timestamp'] = node_df['timestamp'].astype('datetime64[s]')
         metric = pd.Series(values[1])
         col_name = '(node)' + node.name + '_edge_network'
-        df[col_name] = metric
-        df[col_name] = df[col_name].fillna(0)
-        df[col_name] = df[col_name].astype('float64')
+        node_df[col_name] = metric
+        node_df[col_name] = node_df[col_name].astype('float64')
+        node_df = node_df.fillna(0)
+        if df.empty:
+            df = node_df
+        else:
+            df = pd.merge(df, node_df, on='timestamp', how='outer')
+        df = df.fillna(0)
 
         prom_sql = '1-(sum(increase(node_cpu_seconds_total{instance="%s",mode="idle"}[1m]))/sum(increase(node_cpu_seconds_total{instance="%s"}[1m])))' % (
             node.node_name, node.node_name)
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
         values = list(zip(*values))
+        node_df = pd.DataFrame()
+        node_df['timestamp'] = timestamp
+        node_df['timestamp'] = node_df['timestamp'].astype('datetime64[s]')
         metric = pd.Series(values[1])
         col_name = '(node)' + node.name + '_cpu'
-        df[col_name] = metric
-        df[col_name] = df[col_name].astype('float64')
+        node_df[col_name] = metric
+        node_df[col_name] = node_df[col_name].astype('float64')
+        node_df = node_df.fillna(0)
+        if df.empty:
+            df = node_df
+        else:
+            df = pd.merge(df, node_df, on='timestamp', how='outer')
+        df = df.fillna(0)
 
         prom_sql = '(node_memory_MemTotal_bytes{instance="%s"}-(node_memory_MemFree_bytes{instance="%s"}+ node_memory_Cached_bytes{instance="%s"} + node_memory_Buffers_bytes{instance="%s"})) / node_memory_MemTotal_bytes{instance="%s"}' % (
             node.node_name, node.node_name, node.node_name, node.node_name, node.node_name)
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         values = response[0]['values']
         values = list(zip(*values))
+        node_df = pd.DataFrame()
+        node_df['timestamp'] = timestamp
+        node_df['timestamp'] = node_df['timestamp'].astype('datetime64[s]')
         metric = pd.Series(values[1])
         col_name = '(node)' + node.name + '_memory'
-        df[col_name] = metric
-        df[col_name] = df[col_name].astype('float64')
+        node_df[col_name] = metric
+        node_df[col_name] = node_df[col_name].astype('float64')
+        node_df = node_df.fillna(0)
+        if df.empty:
+            df = node_df
+        else:
+            df = pd.merge(df, node_df, on='timestamp', how='outer')
+        df = df.fillna(0)
 
     path = os.path.join(_dir, 'node.csv')
     df.to_csv(path, index=False, mode='a')
