@@ -2,6 +2,7 @@ import os
 from kubernetes import client, config
 
 import Config
+from Config import Node
 
 
 class KubernetesClient:
@@ -11,6 +12,21 @@ class KubernetesClient:
         config.kube_config.load_kube_config(config_file=project_config.k8s_config)
         self.core_api = client.CoreV1Api()  # namespace,pod,service,pv,pvc
         self.apps_api = client.AppsV1Api()  # deployment
+
+    # Get all nodes
+    def get_nodes(self):
+        ret = self.core_api.list_node()
+        nodes = []
+        for i in ret.items:
+            status = 'NotReady'
+            for cond in i.status.conditions:
+                if cond.type == 'Ready':
+                    if cond.status == 'True':
+                        status = 'Ready'
+            nodes.append(
+                Node(i.metadata.name, i.metadata.annotations['flannel.alpha.coreos.com/public-ip'], i.metadata.name,
+                     i.spec.pod_cidr, status))
+        return nodes
 
     # Get all microservices
     def get_svcs(self):

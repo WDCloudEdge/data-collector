@@ -39,7 +39,7 @@ def collect_graph(config: Config, _dir: str):
             # if node ip
             if ":" in destination:
                 destination = destination.split(":")[0]
-                for node in config.nodes:
+                for node in KubernetesClient(config).get_nodes():
                     if node.ip == destination:
                         destination = node.name
                         break
@@ -331,7 +331,7 @@ def collect_succeess_rate(config: Config, _dir: str):
 def collect_node_metric(config: Config, _dir: str):
     df = pd.DataFrame()
     prom_util = PrometheusClient(config)
-    for node in config.nodes:
+    for node in KubernetesClient(config).get_nodes():
         prom_sql = 'rate(node_network_transmit_packets_total{device="cni0", instance="%s"}[1m]) / 1000' % node.node_name
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         # 改动
