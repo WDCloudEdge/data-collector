@@ -3,6 +3,7 @@ from kubernetes import client, config
 
 import Config
 from Config import Node
+from Config import Pod
 
 
 class KubernetesClient:
@@ -27,6 +28,21 @@ class KubernetesClient:
                 Node(i.metadata.name, i.metadata.annotations['flannel.alpha.coreos.com/public-ip'], i.metadata.name,
                      i.spec.pod_cidr, status))
         return nodes
+
+    def get_ns_pods(self, namespaces):
+        converted_pods = []
+        pods = []
+        for namespace in namespaces:
+            field_selector = f"metadata.namespace={namespace}"
+            pods.append(self.core_api.list_pod_for_all_namespaces(field_selector=field_selector))
+
+        # 打印 Pod 信息
+        for pod_item in pods:
+            for pod in pod_item.items:
+                converted_pods.append(
+                    Pod(pod.spec.node_name, pod.metadata.namespace, pod.status.host_ip, pod.status.pod_ip,
+                        pod.metadata.name))
+        return converted_pods
 
     # Get all microservices
     def get_svcs(self):
@@ -91,6 +107,13 @@ class KubernetesClient:
         for i in responses.items:
             result.append(i.metadata.name)
         return result
+
+    def pod_exist(self, namespaces, pod):
+        pods = self.get_ns_pods(namespaces)
+        for pod in pods:
+            if pod.name == pod:
+                return True
+        return False
 
     # def update_yaml(self):
     #     os.system('kubectl apply -f %s > temp.log' % self.k8s_yaml)

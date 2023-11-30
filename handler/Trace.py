@@ -3,6 +3,7 @@ from Config import Config
 import pickle
 import os
 
+
 def collect(config: Config, _dir: str):
     svcs = [svc for svc in config.svcs if
             'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
@@ -14,11 +15,13 @@ def collect(config: Config, _dir: str):
     inbound_half_dicts = {}
     outbound_half_dicts = {}
     abnormal_half_dicts = {}
+    pod_latency = {}
 
     for svc in svcs:
         url = build_trace_url(config, svc + '.' + config.namespace)
         # trace_dict = handle(pull(url))
-        normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict = handle_traces(pull(url), svc)
+        normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict, pod_latency = handle_traces(
+            pull(url), svc)
         normal_dicts = {**normal_dicts, **normal_dict}
         inbound_dicts = {**inbound_dicts, **inbound_dict}
         outbound_dicts = {**outbound_dicts, **outbound_dict}
@@ -33,6 +36,7 @@ def collect(config: Config, _dir: str):
     inbound_half_path = _dir + '/' + 'inbound_half.pkl'
     outbound_half_path = _dir + '/' + 'outbound_half.pkl'
     abnormal_half_path = _dir + '/' + 'abnormal_half.pkl'
+    trace_pod_latency_path = _dir + '/' + 'trace_pod_latency.pkl'
 
     with open(normal_path, 'ab') as fw:
         pickle.dump(list(normal_dicts.values()), fw)
@@ -48,19 +52,23 @@ def collect(config: Config, _dir: str):
         pickle.dump(list(outbound_half_dicts.values()), fw)
     with open(abnormal_half_path, 'ab') as fw:
         pickle.dump(list(abnormal_half_dicts.values()), fw)
+    with open(trace_pod_latency_path, 'ab') as fw:
+        pickle.dump(pod_latency, fw)
 
 
 def build_trace_url(config: Config, svc):
     url = '{}end={}&start={}&limit={}&lookback={}&maxDuration&minDuration&service={}' \
-                .format(config.jaeger_url, config.end * 1000000, config.start * 1000000, config.limit, config.lookBack,
-                        svc)
+        .format(config.jaeger_url, config.end * 1000000, config.start * 1000000, config.limit, config.lookBack,
+                svc)
     return url
+
 
 def build_trace_urls(config: Config):
     '''
         构建每个服务每分钟的trace拉取路径（避免数据量太大）
     '''
-    svcs = [svc + '.' + config.namespace for svc in config.svcs if 'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
+    svcs = [svc + '.' + config.namespace for svc in config.svcs if
+            'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
     urls = ['{}end={}&start={}&limit={}&lookback={}&maxDuration&minDuration&service={}' \
                 .format(config.jaeger_url, config.end * 1000000, config.start * 1000000, config.limit, config.lookBack,
                         svc) for
@@ -98,6 +106,14 @@ def handle_istio_node_id(node_id: str) -> str:
         raise Exception('istio trace node id illegal')
     return s[2] + '-' + s[1]
 
+
+def handle_istio_pod_id(node_id: str) -> str:
+    s = node_id.split('~')
+    if len(s) != 4:
+        raise Exception('istio trace node id illegal')
+    return s[2].split('.')[0]
+
+
 def handle_traces(trace_jsons, current_svc):
     # 需要构建的trace列表
     normal_dicts = {}
@@ -107,6 +123,7 @@ def handle_traces(trace_jsons, current_svc):
     inbound_half_dicts = {}
     outbound_half_dicts = {}
     abnormal_half_dicts = {}
+    pod_latency = {}
     # 遍历所有trace
     for trace_json in trace_jsons:
 
@@ -243,6 +260,12 @@ def handle_traces(trace_jsons, current_svc):
                             trace_dict['call'].append((caller_svc, callee_svc))
                             trace_dict['call_instance'].append(
                                 (handle_istio_node_id(outbound_node_id), handle_istio_node_id(node_id)))
+                            if outbound_node_id != 'OTHER_NODE' and node_id != 'OTHER_NODE':
+                                pod_latency_key = handle_istio_pod_id(outbound_node_id) + '&' + handle_istio_pod_id(
+                                    node_id)
+                                pod_latency_list = pod_latency.get(pod_latency_key, [])
+                                pod_latency_list.append(span_json['duration'])
+                                pod_latency[pod_latency_key] = pod_latency_list
 
         # 再次进行遍历，找到没有对应调用关系的出边
         for span_id in span_flag:
@@ -302,7 +325,7 @@ def handle_traces(trace_jsons, current_svc):
                 outbound_half_dicts[trace_json['traceID']] = half_trace_dict
             else:
                 outbound_half_dicts[trace_json['traceID']] = trace_dict
-    return normal_dicts, inbound_dicts, outbound_dicts, abnormal_dicts, inbound_half_dicts, outbound_half_dicts, abnormal_half_dicts
+    return normal_dicts, inbound_dicts, outbound_dicts, abnormal_dicts, inbound_half_dicts, outbound_half_dicts, abnormal_half_dicts, pod_latency
 
 
 def get_half_trace(trace_json):  # 获取需要阶段的trace_dict
@@ -326,4 +349,3 @@ def get_half_trace(trace_json):  # 获取需要阶段的trace_dict
                 trace_dict['http_status'].append(tag['value'])
 
     return trace_dict
-

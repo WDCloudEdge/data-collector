@@ -1,5 +1,4 @@
 import time
-from util.KubernetesClient import KubernetesClient
 
 class Config:
     def __init__(self):
@@ -39,3 +38,12 @@ class Node:
         self.node_name = node_name
         self.cni_ip = cni_ip
         self.status = status
+
+
+class Pod:
+    def __init__(self, node, namespace, host_ip, ip, name):
+        self.node = node
+        self.namespace = namespace
+        self.host_ip = host_ip
+        self.ip = ip
+        self.name = name
