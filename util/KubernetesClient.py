@@ -2,6 +2,8 @@ import os
 from kubernetes import client, config
 
 import Config
+from Config import Node
+from Config import Pod
 
 
 class KubernetesClient:
@@ -11,6 +13,36 @@ class KubernetesClient:
         config.kube_config.load_kube_config(config_file=project_config.k8s_config)
         self.core_api = client.CoreV1Api()  # namespace,pod,service,pv,pvc
         self.apps_api = client.AppsV1Api()  # deployment
+
+    # Get all nodes
+    def get_nodes(self):
+        ret = self.core_api.list_node()
+        nodes = []
+        for i in ret.items:
+            status = 'NotReady'
+            for cond in i.status.conditions:
+                if cond.type == 'Ready':
+                    if cond.status == 'True':
+                        status = 'Ready'
+            nodes.append(
+                Node(i.metadata.name, i.metadata.annotations['flannel.alpha.coreos.com/public-ip'], i.metadata.name,
+                     i.spec.pod_cidr, status))
+        return nodes
+
+    def get_ns_pods(self, namespaces):
+        converted_pods = []
+        pods = []
+        for namespace in namespaces:
+            field_selector = f"metadata.namespace={namespace}"
+            pods.append(self.core_api.list_pod_for_all_namespaces(field_selector=field_selector))
+
+        # 打印 Pod 信息
+        for pod_item in pods:
+            for pod in pod_item.items:
+                converted_pods.append(
+                    Pod(pod.spec.node_name, pod.metadata.namespace, pod.status.host_ip, pod.status.pod_ip,
+                        pod.metadata.name))
+        return converted_pods
 
     # Get all microservices
     def get_svcs(self):
@@ -75,6 +107,13 @@ class KubernetesClient:
         for i in responses.items:
             result.append(i.metadata.name)
         return result
+
+    def pod_exist(self, namespaces, pod):
+        pods = self.get_ns_pods(namespaces)
+        for pod in pods:
+            if pod.name == pod:
+                return True
+        return False
 
     # def update_yaml(self):
     #     os.system('kubectl apply -f %s > temp.log' % self.k8s_yaml)

@@ -9,8 +9,8 @@ if __name__ == "__main__":
     namespaces = ['bookinfo']
     config = Config()
 
-    global_now_time = 1700289600
-    global_end_time = 1700290200
+    global_now_time = 1701319560
+    global_end_time = 1701320160
     now = int(time.time())
     if global_now_time > now:
         sys.exit("begin time is after now time")

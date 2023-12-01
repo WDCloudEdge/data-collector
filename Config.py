@@ -1,19 +1,9 @@
 import time
 
-
 class Config:
     def __init__(self):
         self.namespace = 'bookinfo'
-        self.nodes = [
-            Node('master', '172.26.146.178', 'izbp193ioajdcnpofhlr1hz'),
-            Node('cloud-worker1', '172.26.146.180', 'izbp1gwb52uyj3g0wn52lez'),
-            Node('cloud-worker2', '172.26.146.179', 'izbp1gwb52uyj3g0wn52lfz'),
-            Node('cloud-worker3', '172.23.182.14', 'izbp16opgy3xucvexwqp9dz'),
-            Node('edge-worker1', '192.168.31.74', 'server-1'),
-            Node('edge-worker2', '192.168.31.85', 'server-2'),
-            Node('edge-worker3', '192.168.31.128', 'server-3'),
-            Node('edge-worker4', '192.168.31.208', 'dell2018')
-        ]
+        self.nodes = None
         self.svcs = set()
         self.pods = set()
 
@@ -42,7 +32,18 @@ class Config:
 
 
 class Node:
-    def __init__(self, name, ip, node_name):
+    def __init__(self, name, ip, node_name, cni_ip, status):
         self.name = name
         self.ip = ip
         self.node_name = node_name
+        self.cni_ip = cni_ip
+        self.status = status
+
+
+class Pod:
+    def __init__(self, node, namespace, host_ip, ip, name):
+        self.node = node
+        self.namespace = namespace
+        self.host_ip = host_ip
+        self.ip = ip
+        self.name = name
