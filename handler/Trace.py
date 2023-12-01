@@ -4,8 +4,11 @@ import pickle
 import os
 
 def collect(config: Config, _dir: str):
+    # 确定命名空间中需要访问的服务
     svcs = [svc for svc in config.svcs if
             'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
+    if config.namespace == 'horsecoder-test':
+        svcs = ['edge-gateway-svc', 'edge-llm-svc', 'edge-paraformer-serverless-svc']
     # urls = build_trace_urls(config)
     normal_dicts = {}
     inbound_dicts = {}
@@ -14,10 +17,15 @@ def collect(config: Config, _dir: str):
     inbound_half_dicts = {}
     outbound_half_dicts = {}
     abnormal_half_dicts = {}
+    svcs_edge = {'edge-gateway-svc': 'edge-gateway', 'edge-llm-svc': 'edge-llm-1.0.0', 'edge-paraformer-serverless-svc': 'edge-paraformer-serverless-1.0.0'}
 
     for svc in svcs:
-        url = build_trace_url(config, svc + '.' + config.namespace)
-        # trace_dict = handle(pull(url))
+        if config.namespace == 'cloud-sock-shop':
+            url = build_trace_url(config, svc)
+        elif config.namespace =='horsecoder-test':
+            url = build_trace_url(config, svcs_edge[svc])
+        else:
+            url = build_trace_url(config, svc + '.' + config.namespace)
         normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict = handle_traces(pull(url), svc)
         normal_dicts = {**normal_dicts, **normal_dict}
         inbound_dicts = {**inbound_dicts, **inbound_dict}
