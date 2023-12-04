@@ -108,6 +108,18 @@ class KubernetesClient:
             result.append(i.metadata.name)
         return result
 
+    def get_all_svc(self):
+        namespaces = ['bookinfo', 'hipster', 'hipster2', 'sock-shop', 'horsecoder-test']
+        namespace_svc_dict = {}
+        for namespace in namespaces:
+            responses = self.core_api.list_namespaced_service(namespace)
+            svc_list = []
+            for i in responses.items:
+                svc_list.append(i.metadata.name)
+            namespace_svc_dict[namespace] = svc_list
+
+        return namespace_svc_dict
+
     def pod_exist(self, namespaces, pod):
         pods = self.get_ns_pods(namespaces)
         for pod in pods:
