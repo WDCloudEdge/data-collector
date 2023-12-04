@@ -19,16 +19,16 @@ class Config:
         self.prom_no_range_url = "http://47.99.240.112:31444/api/v1/query"
         self.step = 5
 
-        # jarger
+        # jaeger
         self.jaeger_url = 'http://47.99.200.176:16686/api/traces?'
         self.lookBack = str(int(self.duration / 60)) + 'm'
-        self.limit = 100000
+        self.limit = 100
 
         # kubernetes
         self.k8s_config = 'config.yaml'  # kubernetes配置文件地址
 
         # concurrency set
-        self.user = '20user-hybrid-20231118'
+        self.user = 'istio-test'
 
 
 class Node:

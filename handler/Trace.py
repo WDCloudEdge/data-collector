@@ -2,6 +2,7 @@ import requests
 from Config import Config
 import pickle
 from util.KubernetesClient import KubernetesClient
+from .TraceNoIstio import handle_traces_no_istio
 import os
 
 global_svcs = []
@@ -31,10 +32,10 @@ def collect(config: Config, _dir: str):
 
         if config.namespace == 'cloud-sock-shop':
             url = build_trace_url(config, svc)
-            normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict, pod_latency = handle_traces_no_istio(pull(url), svc)
+            normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict, pod_latency = handle_traces_no_istio(pull(url), config)
         elif config.namespace == 'horsecoder-test':
             url = build_trace_url(config, svc[:-4] + '-1.0.0')
-            normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict, pod_latency = handle_traces_no_istio(pull(url), svc)
+            normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict, pod_latency = handle_traces_no_istio(pull(url), config)
         else:
             url = build_trace_url(config, svc + '.' + config.namespace)
             normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict, pod_latency = handle_traces_istio(pull(url), svc)
@@ -367,7 +368,7 @@ def get_half_trace(trace_json):  # 获取需要阶段的trace_dict
 '''
     对没有加入服务网格的微服务系统收集trace数据
 '''
-def handle_traces_no_istio(trace_jsons, current_svc):
+def handle_traces_no_istio_old(trace_jsons, current_svc):
     # 需要构建的trace列表
     normal_dicts = {}
     inbound_dicts = {}

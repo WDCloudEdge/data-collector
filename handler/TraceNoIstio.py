@@ -1,0 +1,299 @@
+from Config import Config
+import pickle
+from util.KubernetesClient import KubernetesClient
+
+
+global_namespace_svcs_dict = {}
+current_namespace = None
+
+
+'''
+    对不在服务网格中的微服务系统收集trace
+'''
+def handle_traces_no_istio(trace_jsons, config: Config):
+    # 获取各命名空间的服务名称
+    global global_namespace_svcs_dict
+    global_namespace_svcs_dict = KubernetesClient(config).get_all_svc()
+
+    # 定义返回数据
+    normal_dicts = {}
+    inbound_dicts = {}
+    outbound_dicts = {}
+    abnormal_dicts = {}
+    inbound_half_dicts = {}
+    outbound_half_dicts = {}
+    abnormal_half_dicts = {}
+    pod_latency = {}
+
+    # 遍历所有trace
+    for trace_json in trace_jsons:
+        # 定义trace_dict
+        trace_dict = get_empty_trace_dict(trace_json['traceID'])
+        half_trace_dict = get_empty_trace_dict(trace_json['traceID'])
+        # 获取trace的process
+        process_dicts = get_trace_process(trace_json)
+        # 获取trace中的所有span
+        spans_dict = {}
+        for span_json in trace_json['spans']:
+            spans_dict[span_json['spanID']] = span_json
+
+        # 定义标志位
+        is_inbound = False
+        is_outbound = False
+
+        # 处理所有的span
+        for span_json in trace_json['spans']:
+            # 判断该span是否有用,如果无用或为顶级span，则跳过这个span
+            is_span_useful, span_json = get_span_useful(span_json)
+            # 获取出边span信息
+            outbound_span = get_outbound_span(spans_dict, span_json, trace_dict)
+            if is_span_useful is False or outbound_span is None:
+                continue
+
+            # 添加信息
+            inbound_pod_ip, inbound_pod_name, callee_svc, inbound_namespace = get_span_information(span_json, process_dicts)
+            outbound_pod_ip, outbound_pod_name, caller_svc, outbound_namespace = get_span_information(outbound_span, process_dicts)
+            trace_dict = add_trace_information(outbound_span, trace_dict)
+            trace_dict = add_trace_information(span_json, trace_dict)
+
+            # 将调用关系添加到trace中
+            trace_dict['svc'].append(callee_svc)
+            trace_dict['call'].append((caller_svc, callee_svc))
+            trace_dict['call_instance'].append((handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace)))
+            # 处理pod信息
+            pod_latency_key = outbound_pod_name + '&' + inbound_pod_name
+            pod_latency_list = pod_latency.get(pod_latency_key, [])
+            pod_latency_list.append(span_json['duration'])
+            pod_latency[pod_latency_key] = pod_latency_list
+
+            # 判断是否跨系统，并选择将其加入到half_trace_dict中
+            # 入边跨系统，出边为系统内
+            if current_namespace != inbound_namespace and current_namespace == outbound_namespace:
+                is_outbound = True
+                half_trace_dict = add_outbound_trace_information(outbound_span, half_trace_dict)
+                half_trace_dict['svc'].append('OTHER_SVC')
+                half_trace_dict['call'].append((caller_svc, 'OTHER_SYSTEM'))
+                half_trace_dict['call_instance'].append(handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace),handle_node_id_no_istio('OTHER_NODE', '', ''))
+            # 出边跨系统，入边为系统内
+            elif current_namespace == inbound_namespace and current_namespace != outbound_namespace:
+                is_inbound = True
+                half_trace_dict = add_inbound_trace_information(span_json, half_trace_dict)
+                half_trace_dict['svc'].append(callee_svc)
+                half_trace_dict['call'].append(('OTHER_SYSTEM', callee_svc))
+                half_trace_dict['call_instance'].append(handle_node_id_no_istio('OTHER_NODE', '', ''), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace))
+            # 都在服务内，将其完整装入half_trace_dict中
+            elif current_namespace == inbound_namespace and current_namespace == outbound_namespace:
+                half_trace_dict = add_trace_information(outbound_span, trace_dict)
+                half_trace_dict = add_trace_information(span_json, trace_dict)
+                trace_dict['svc'].append(callee_svc)
+                trace_dict['call'].append((caller_svc, callee_svc))
+                trace_dict['call_instance'].append((handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace)))
+            # 两方都跨系统则不将其加入half_trace数据中
+
+        # 根据标志位判断是否加入个trace信息中
+        # 判断trace_dict是否正常
+        if is_abnormal(trace_dict):
+            abnormal_dicts[trace_json['traceID']] = trace_dict
+        else:
+            normal_dicts[trace_json['traceID']] = trace_dict
+        # 判断half_trace_dict是否正常
+        if is_abnormal(half_trace_dict) and (is_inbound is True or is_outbound is True):
+            abnormal_half_dicts[trace_json['traceID']] = half_trace_dict
+        # 判断出边和入边
+        if is_inbound is True:
+            inbound_dicts[trace_json['traceID']] = trace_dict
+            inbound_half_dicts[trace_json['traceID']] = half_trace_dict
+        if is_outbound is True:
+            outbound_dicts[trace_json['traceID']] = trace_dict
+            outbound_half_dicts[trace_json['traceID']] = half_trace_dict
+
+    return normal_dicts, inbound_dicts, outbound_dicts, abnormal_dicts, inbound_half_dicts, outbound_half_dicts, abnormal_half_dicts, pod_latency
+
+'''
+    得到一个空的trace_dict
+'''
+def get_empty_trace_dict(traceId):
+    trace_dict = {'traceId': traceId}
+    # 定义trace字段
+    trace_dict['call'] = []
+    trace_dict['timestamp'] = []
+    trace_dict['latency'] = []
+    trace_dict['http_status'] = []
+    trace_dict['svc'] = []
+    trace_dict['call_instance'] = []
+
+    return trace_dict
+
+
+'''
+    获取trace数据中的process数据
+    process 的 key: processId, service_name, pod_name, pod_ip
+'''
+def get_trace_process(trace_json):
+    process_json = trace_json['processes']
+    process_dicts = {}
+    for key in process_json.keys():
+        process_dict = {'processId': key}
+        process = process_json[key]
+        process_dict['service_name'] = process['serviceName']
+        for tag in process['tags']:
+            if tag['key'] == 'host.name':
+                process_dict['pod_name'] = tag['value']
+            if tag['key'] == 'ip':
+                process_dict['pod_ip'] = tag['value']
+        process_dicts[process_dict['processId']] = process_dict
+
+    return process_dicts
+
+
+'''
+    判断span是否有用
+'''
+def get_span_useful(span_json):
+    is_span_useful = False
+    is_horsecoder_span = False
+
+    for tag in span_json['tags']:
+        # 查找是否含有net.host.name的标签
+        if tag['key'] == 'net.host.name':
+            is_span_useful = True
+            break
+        # 查找是否含有edge请求相关的标签
+        if tag['key'] == 'thread.name' and 'DubboServerHandler' in tag['value']:
+            for tg in span_json['tags']:
+                if tg['key'] == 'rpc.method':
+                    is_span_useful = True
+                    is_horsecoder_span = True
+                    break
+            break
+    # 对于horsecoder的服务，添加http_status默认为200
+    if is_horsecoder_span is True:
+        http_tag = {'key': 'http.status_code'}
+        http_tag['value'] = 200
+        span_json['tags'].append(http_tag)
+
+    return is_span_useful, span_json
+
+
+def get_outbound_span(spans_dict, span_json, trace_dict):
+    outbound_span = {}
+    # 引用为空，为顶级节点，返回None
+    if span_json['references'] == []:
+        return None
+    else:
+        for ref in span_json['references']:
+            if ref['refType'] == 'CHILD_OF':
+                # 引用了无效的span，返回None
+                if ref['spanID'] not in spans_dict.keys():
+                    return None
+                else:  # 引用的span存在，判断是否有用
+                    tmp_span = spans_dict[ref['spanID']]
+                    tmp_span_useful, tmp_span = get_span_useful(tmp_span)
+                    # 如果有用，则返回；否则继续向上递归
+                    if tmp_span_useful is True:
+                        outbound_span = tmp_span
+                        break
+                    else:
+                        outbound_span = get_outbound_span(spans_dict, tmp_span, trace_dict)
+    return outbound_span
+
+
+'''
+    向trace_dict添加timestamp,latency,http_status数据
+'''
+def add_trace_information(span_json, trace_dict):
+    trace_dict['timestamp'].append(span_json['startTime'])
+    trace_dict['latency'].append(span_json['duration'])
+    for tag in span_json['tags']:
+        if tag['key'] == 'http.status_code':
+            trace_dict['http_status'].append(tag['value'])
+
+    return trace_dict
+
+
+def add_outbound_trace_information(outbound_span, half_trace_dict):
+    # 添加出边的trace信息
+    half_trace_dict['timestamp'].append(outbound_span['startTime'])
+    half_trace_dict['latency'].append(outbound_span['duration'])
+    for tag in outbound_span['tags']:
+        if tag['key'] == 'http.status_code':
+            half_trace_dict['http_status'].append(tag['value'])
+    # 添加入边的trace信息
+    half_trace_dict['timestamp'].append(-1)
+    half_trace_dict['latency'].append(-1)
+    half_trace_dict['http_status'].append(-1)
+
+    return half_trace_dict
+
+
+def add_inbound_trace_information(span_json, half_trace_dict):
+    # 添加出边的trace信息
+    half_trace_dict['timestamp'].append(-1)
+    half_trace_dict['latency'].append(-1)
+    half_trace_dict['http_status'].append(-1)
+    # 添加出边的trace信息
+    half_trace_dict['timestamp'].append(span_json['startTime'])
+    half_trace_dict['latency'].append(span_json['duration'])
+    for tag in span_json['tags']:
+        if tag['key'] == 'http.status_code':
+            half_trace_dict['http_status'].append(tag['value'])
+
+    return half_trace_dict
+
+
+def get_span_information(span_json, process_dicts):
+    # horsecoder 服务名转换
+    horsecoder_test_svcs = {'edge-gateway': 'edge-gateway-svc', 'edge-llm-1.0.0': 'edge-llm-svc', 'edge-paraformer-serverless-1.0.0': 'edge-paraformer-serverless-svc'}
+
+    processId = span_json['processID']
+    print(span_json)
+    print(process_dicts)
+    process_dict = process_dicts[processId]
+
+    pod_ip = process_dict['pod_ip']
+    pod_name = process_dict['pod_name']
+    svc_name = process_dict['service_name']
+    if (svc_name in horsecoder_test_svcs.keys()):
+        svc_name = horsecoder_test_svcs[svc_name]
+    namespace = get_svc_namespace(svc_name)
+
+    return pod_ip, pod_name, svc_name, namespace
+
+
+def get_svc_namespace(svc):
+    global global_namespace_svcs_dict
+    for key in global_namespace_svcs_dict.keys():
+        svc_list = global_namespace_svcs_dict[key]
+        if svc in svc_list:
+            return key
+    print(svc + "not found.")
+    return None
+
+
+def handle_node_id_no_istio(node_name, node_id, namespace):
+    if node_name == 'OTHER_NODE':
+        return 'OTER_NODE'
+    return node_name + '.' + namespace + '-' + node_id
+
+
+'''
+    判断trace是否正常
+'''
+def is_abnormal(trace_dict):
+    # 调用关系为空，则设定为不正常
+    if trace_dict['call'] == []:
+        return True
+    for code in trace_dict['http_status']:
+        if code < 200 or code >= 300:
+            return True
+    return False
+
+
+
+
+
+
+
+
+
+
