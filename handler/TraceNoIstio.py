@@ -1,5 +1,4 @@
 from Config import Config
-import pickle
 from util.KubernetesClient import KubernetesClient
 
 
@@ -14,6 +13,8 @@ def handle_traces_no_istio(trace_jsons, config: Config):
     # 获取各命名空间的服务名称
     global global_namespace_svcs_dict
     global_namespace_svcs_dict = KubernetesClient(config).get_all_svc()
+    global current_namespace
+    current_namespace = config.namespace
 
     # 定义返回数据
     normal_dicts = {}
@@ -23,7 +24,6 @@ def handle_traces_no_istio(trace_jsons, config: Config):
     inbound_half_dicts = {}
     outbound_half_dicts = {}
     abnormal_half_dicts = {}
-    pod_latency = {}
 
     # 遍历所有trace
     for trace_json in trace_jsons:
@@ -53,42 +53,39 @@ def handle_traces_no_istio(trace_jsons, config: Config):
             # 添加信息
             inbound_pod_ip, inbound_pod_name, callee_svc, inbound_namespace = get_span_information(span_json, process_dicts)
             outbound_pod_ip, outbound_pod_name, caller_svc, outbound_namespace = get_span_information(outbound_span, process_dicts)
-            trace_dict = add_trace_information(outbound_span, trace_dict)
-            trace_dict = add_trace_information(span_json, trace_dict)
+            trace_dict = add_trace_information(span_json, outbound_span, trace_dict, spans_dict)
 
             # 将调用关系添加到trace中
             trace_dict['svc'].append(callee_svc)
             trace_dict['call'].append((caller_svc, callee_svc))
             trace_dict['call_instance'].append((handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace)))
-            # 处理pod信息
-            pod_latency_key = outbound_pod_name + '&' + inbound_pod_name
-            pod_latency_list = pod_latency.get(pod_latency_key, [])
-            pod_latency_list.append(span_json['duration'])
-            pod_latency[pod_latency_key] = pod_latency_list
 
             # 判断是否跨系统，并选择将其加入到half_trace_dict中
             # 入边跨系统，出边为系统内
             if current_namespace != inbound_namespace and current_namespace == outbound_namespace:
                 is_outbound = True
-                half_trace_dict = add_outbound_trace_information(outbound_span, half_trace_dict)
+                half_trace_dict = add_outbound_trace_information(outbound_span, half_trace_dict, span_json, spans_dict)
                 half_trace_dict['svc'].append('OTHER_SVC')
                 half_trace_dict['call'].append((caller_svc, 'OTHER_SYSTEM'))
-                half_trace_dict['call_instance'].append(handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace),handle_node_id_no_istio('OTHER_NODE', '', ''))
+                half_trace_dict['call_instance'].append((handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace),handle_node_id_no_istio('OTHER_NODE', '', '')))
             # 出边跨系统，入边为系统内
             elif current_namespace == inbound_namespace and current_namespace != outbound_namespace:
                 is_inbound = True
                 half_trace_dict = add_inbound_trace_information(span_json, half_trace_dict)
                 half_trace_dict['svc'].append(callee_svc)
                 half_trace_dict['call'].append(('OTHER_SYSTEM', callee_svc))
-                half_trace_dict['call_instance'].append(handle_node_id_no_istio('OTHER_NODE', '', ''), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace))
+                half_trace_dict['call_instance'].append((handle_node_id_no_istio('OTHER_NODE', '', ''), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace)))
             # 都在服务内，将其完整装入half_trace_dict中
             elif current_namespace == inbound_namespace and current_namespace == outbound_namespace:
-                half_trace_dict = add_trace_information(outbound_span, trace_dict)
-                half_trace_dict = add_trace_information(span_json, trace_dict)
-                trace_dict['svc'].append(callee_svc)
-                trace_dict['call'].append((caller_svc, callee_svc))
-                trace_dict['call_instance'].append((handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace)))
+                half_trace_dict = add_trace_information(span_json, outbound_span, half_trace_dict, spans_dict)
+                half_trace_dict['svc'].append(callee_svc)
+                half_trace_dict['call'].append((caller_svc, callee_svc))
+                half_trace_dict['call_instance'].append((handle_node_id_no_istio(outbound_pod_name, outbound_pod_ip, outbound_namespace), handle_node_id_no_istio(inbound_pod_name, inbound_pod_ip, inbound_namespace)))
             # 两方都跨系统则不将其加入half_trace数据中
+
+        # 如果trace的调用关系为空，则部将其加入数据中
+        if trace_dict['call'] == []:
+            continue
 
         # 根据标志位判断是否加入个trace信息中
         # 判断trace_dict是否正常
@@ -107,7 +104,7 @@ def handle_traces_no_istio(trace_jsons, config: Config):
             outbound_dicts[trace_json['traceID']] = trace_dict
             outbound_half_dicts[trace_json['traceID']] = half_trace_dict
 
-    return normal_dicts, inbound_dicts, outbound_dicts, abnormal_dicts, inbound_half_dicts, outbound_half_dicts, abnormal_half_dicts, pod_latency
+    return normal_dicts, inbound_dicts, outbound_dicts, abnormal_dicts, inbound_half_dicts, outbound_half_dicts, abnormal_half_dicts
 
 '''
     得到一个空的trace_dict
@@ -151,7 +148,6 @@ def get_trace_process(trace_json):
 '''
 def get_span_useful(span_json):
     is_span_useful = False
-    is_horsecoder_span = False
 
     for tag in span_json['tags']:
         # 查找是否含有net.host.name的标签
@@ -163,14 +159,8 @@ def get_span_useful(span_json):
             for tg in span_json['tags']:
                 if tg['key'] == 'rpc.method':
                     is_span_useful = True
-                    is_horsecoder_span = True
                     break
             break
-    # 对于horsecoder的服务，添加http_status默认为200
-    if is_horsecoder_span is True:
-        http_tag = {'key': 'http.status_code'}
-        http_tag['value'] = 200
-        span_json['tags'].append(http_tag)
 
     return is_span_useful, span_json
 
@@ -188,7 +178,7 @@ def get_outbound_span(spans_dict, span_json, trace_dict):
                     return None
                 else:  # 引用的span存在，判断是否有用
                     tmp_span = spans_dict[ref['spanID']]
-                    tmp_span_useful, tmp_span = get_span_useful(tmp_span)
+                    tmp_span_useful, test_span = get_span_useful(tmp_span)
                     # 如果有用，则返回；否则继续向上递归
                     if tmp_span_useful is True:
                         outbound_span = tmp_span
@@ -201,23 +191,45 @@ def get_outbound_span(spans_dict, span_json, trace_dict):
 '''
     向trace_dict添加timestamp,latency,http_status数据
 '''
-def add_trace_information(span_json, trace_dict):
-    trace_dict['timestamp'].append(span_json['startTime'])
+def add_trace_information(span_json, outbound_span, trace_dict, spans_dict):
+    # 添加出边信息
+    is_horsecoder_outbound_span = True
+    # 获取出边的时间信息
+    outbound_timestamp, outbound_latency = get_outbound_time(span_json, spans_dict)
+    trace_dict['timestamp'].append(outbound_timestamp + clock_skew_adjust(span_json))
+    trace_dict['latency'].append(outbound_latency)
+    for tag in outbound_span['tags']:
+        if tag['key'] == 'http.status_code':
+            is_horsecoder_outbound_span = False
+            trace_dict['http_status'].append(tag['value'])
+    if is_horsecoder_outbound_span == True:
+        trace_dict['http_status'].append(200)
+    # 添加入边信息
+    is_horsecoder_span = True
+    trace_dict['timestamp'].append(span_json['startTime'] + clock_skew_adjust(span_json))
     trace_dict['latency'].append(span_json['duration'])
     for tag in span_json['tags']:
         if tag['key'] == 'http.status_code':
+            is_horsecoder_span = False
             trace_dict['http_status'].append(tag['value'])
+    if is_horsecoder_span == True:
+        trace_dict['http_status'].append(200)
 
     return trace_dict
 
 
-def add_outbound_trace_information(outbound_span, half_trace_dict):
+def add_outbound_trace_information(outbound_span, half_trace_dict, span_json, spans_dict):
+    is_horsecoder_span = True
     # 添加出边的trace信息
-    half_trace_dict['timestamp'].append(outbound_span['startTime'])
-    half_trace_dict['latency'].append(outbound_span['duration'])
+    outbound_timestamp, outbound_latency = get_outbound_time(span_json, spans_dict)
+    half_trace_dict['timestamp'].append(outbound_timestamp + clock_skew_adjust(outbound_span))
+    half_trace_dict['latency'].append(outbound_latency)
     for tag in outbound_span['tags']:
         if tag['key'] == 'http.status_code':
+            is_horsecoder_span = False
             half_trace_dict['http_status'].append(tag['value'])
+    if is_horsecoder_span == True:
+        half_trace_dict['http_status'].append(200)
     # 添加入边的trace信息
     half_trace_dict['timestamp'].append(-1)
     half_trace_dict['latency'].append(-1)
@@ -227,16 +239,20 @@ def add_outbound_trace_information(outbound_span, half_trace_dict):
 
 
 def add_inbound_trace_information(span_json, half_trace_dict):
+    is_horsecoder_span = True
     # 添加出边的trace信息
     half_trace_dict['timestamp'].append(-1)
     half_trace_dict['latency'].append(-1)
     half_trace_dict['http_status'].append(-1)
     # 添加出边的trace信息
-    half_trace_dict['timestamp'].append(span_json['startTime'])
+    half_trace_dict['timestamp'].append(span_json['startTime'] + + clock_skew_adjust(span_json))
     half_trace_dict['latency'].append(span_json['duration'])
     for tag in span_json['tags']:
         if tag['key'] == 'http.status_code':
+            is_horsecoder_span = False
             half_trace_dict['http_status'].append(tag['value'])
+    if is_horsecoder_span == True:
+        half_trace_dict['http_status'].append(200)
 
     return half_trace_dict
 
@@ -246,8 +262,6 @@ def get_span_information(span_json, process_dicts):
     horsecoder_test_svcs = {'edge-gateway': 'edge-gateway-svc', 'edge-llm-1.0.0': 'edge-llm-svc', 'edge-paraformer-serverless-1.0.0': 'edge-paraformer-serverless-svc'}
 
     processId = span_json['processID']
-    print(span_json)
-    print(process_dicts)
     process_dict = process_dicts[processId]
 
     pod_ip = process_dict['pod_ip']
@@ -272,7 +286,7 @@ def get_svc_namespace(svc):
 
 def handle_node_id_no_istio(node_name, node_id, namespace):
     if node_name == 'OTHER_NODE':
-        return 'OTER_NODE'
+        return 'OTHER_NODE'
     return node_name + '.' + namespace + '-' + node_id
 
 
@@ -284,12 +298,43 @@ def is_abnormal(trace_dict):
     if trace_dict['call'] == []:
         return True
     for code in trace_dict['http_status']:
-        if code < 200 or code >= 300:
+        if (code < 200 and code != -1) or code >= 300:
             return True
     return False
 
 
+def get_outbound_time(span_json, spans_dict):
+    outbound_timestamp = None
+    outbound_latency = None
+    # 引用为空，为顶级节点，返回None
+    if span_json['references'] == []:
+        return None
+    else:
+        for ref in span_json['references']:
+            if ref['refType'] == 'CHILD_OF':
+                # 引用了无效的span，返回None
+                if ref['spanID'] not in spans_dict.keys():
+                    return None
+                else:  # 引用的span存在，判断是否有用
+                    tmp_span = spans_dict[ref['spanID']]
+                    outbound_timestamp = tmp_span['startTime'] + clock_skew_adjust(tmp_span)
+                    outbound_latency = tmp_span['duration']
 
+    return outbound_timestamp, outbound_latency
+
+
+def clock_skew_adjust(span_json):
+    if span_json['warnings'] != None:
+        for warning in span_json['warnings']:
+            if 'clock skew adjustment' in warning:
+                adjust_flag = warning.split(' ')[-1][-2:]
+                adjust_time = float(warning.split(' ')[-1].strip('µms'))
+                if adjust_flag == 'ms':
+                    return int(adjust_time * 1000)
+                elif adjust_flag == 'µs':
+                    return int(adjust_time)
+    else:
+        return 0
 
 
 
