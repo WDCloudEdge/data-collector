@@ -144,6 +144,9 @@ def handle_traces_istio(trace_jsons, config: Config):
     return normal_dicts, inbound_dicts, outbound_dicts, abnormal_dicts, inbound_half_dicts, outbound_half_dicts, abnormal_half_dicts
 
 
+'''
+    获得空的trace_dict
+'''
 def get_empty_trace_dict(traceId):
     trace_dict = {'traceId': traceId}
     # 定义trace字段
@@ -157,6 +160,9 @@ def get_empty_trace_dict(traceId):
     return trace_dict
 
 
+'''
+    获得该span的父span
+'''
 def get_outbound_span(spans_dict, span_json, trace_dict):
     outbound_span = {}
     # 引用为空，为顶级节点，返回None
@@ -174,6 +180,9 @@ def get_outbound_span(spans_dict, span_json, trace_dict):
     return outbound_span
 
 
+'''
+    判断该span是否是出边
+'''
 def is_outbound_span(span_json):
     for tag in span_json['tags']:
         if 'upstream_cluster' == tag['key']:
@@ -183,6 +192,9 @@ def is_outbound_span(span_json):
     return False
 
 
+'''
+    判断该span是否是入边
+'''
 def is_inbound_span(span_json):
     for tag in span_json['tags']:
         if 'upstream_cluster' == tag['key']:
@@ -191,6 +203,10 @@ def is_inbound_span(span_json):
 
     return False
 
+
+'''
+    获得span的基本信息
+'''
 def get_span_information(span_json):
 
     node_id = None
@@ -212,6 +228,9 @@ def get_span_information(span_json):
     return node_id, svc, namespace
 
 
+'''
+    向trace_dict添加信息
+'''
 def add_trace_information(span_json, trace_dict):
     trace_dict['timestamp'].append(span_json['startTime'] + clock_skew_adjust(span_json))
     trace_dict['latency'].append(span_json['duration'])
@@ -247,6 +266,9 @@ def handle_istio_pod_id(node_id: str) -> str:
     return s[2].split('.')[0]
 
 
+'''
+    向出边为系统内部的half_trace添加信息
+'''
 def add_outbound_trace_information(outbound_span, half_trace_dict):
     # 添加出边的trace信息
     half_trace_dict['timestamp'].append(outbound_span['startTime'] + clock_skew_adjust(outbound_span))
@@ -262,6 +284,9 @@ def add_outbound_trace_information(outbound_span, half_trace_dict):
     return half_trace_dict
 
 
+'''
+    向入边为系统内部的half_trace添加信息
+'''
 def add_inbound_trace_information(span_json, half_trace_dict):
     # 添加出边的trace信息
     half_trace_dict['timestamp'].append(-1)
@@ -277,6 +302,9 @@ def add_inbound_trace_information(span_json, half_trace_dict):
     return half_trace_dict
 
 
+'''
+    判断span是否异常
+'''
 def is_span_abnormal(trace_dict):
     # 调用关系为空，则设定为不正常
     if trace_dict['call'] == []:
@@ -287,6 +315,7 @@ def is_span_abnormal(trace_dict):
     return False
 
 
+'''使用jaeger的时钟调整'''
 def clock_skew_adjust(span_json):
     if span_json['warnings'] != None:
         for warning in span_json['warnings']:

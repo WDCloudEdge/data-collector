@@ -165,6 +165,9 @@ def get_span_useful(span_json):
     return is_span_useful, span_json
 
 
+'''
+    寻找该span的父span
+'''
 def get_outbound_span(spans_dict, span_json, trace_dict):
     outbound_span = {}
     # 引用为空，为顶级节点，返回None
@@ -218,6 +221,9 @@ def add_trace_information(span_json, outbound_span, trace_dict, spans_dict):
     return trace_dict
 
 
+'''
+    向出边为系统内部的half_trace添加信息
+'''
 def add_outbound_trace_information(outbound_span, half_trace_dict, span_json, spans_dict):
     is_horsecoder_span = True
     # 添加出边的trace信息
@@ -238,6 +244,9 @@ def add_outbound_trace_information(outbound_span, half_trace_dict, span_json, sp
     return half_trace_dict
 
 
+'''
+    向入边为系统内部的half_trace添加信息
+'''
 def add_inbound_trace_information(span_json, half_trace_dict):
     is_horsecoder_span = True
     # 添加出边的trace信息
@@ -257,6 +266,9 @@ def add_inbound_trace_information(span_json, half_trace_dict):
     return half_trace_dict
 
 
+'''
+    获得span信息
+'''
 def get_span_information(span_json, process_dicts):
     # horsecoder 服务名转换
     horsecoder_test_svcs = {'edge-gateway': 'edge-gateway-svc', 'edge-llm-1.0.0': 'edge-llm-svc', 'edge-paraformer-serverless-1.0.0': 'edge-paraformer-serverless-svc'}
@@ -274,6 +286,9 @@ def get_span_information(span_json, process_dicts):
     return pod_ip, pod_name, svc_name, namespace
 
 
+'''
+    获得服务对应的命名空间（对hipster和hipster2可能会产生冲突，但应该不存在与二者相关的链路）
+'''
 def get_svc_namespace(svc):
     global global_namespace_svcs_dict
     for key in global_namespace_svcs_dict.keys():
@@ -284,6 +299,9 @@ def get_svc_namespace(svc):
     return None
 
 
+'''
+    合成调用实例名
+'''
 def handle_node_id_no_istio(node_name, node_id, namespace):
     if node_name == 'OTHER_NODE':
         return 'OTHER_NODE'
@@ -303,6 +321,9 @@ def is_abnormal(trace_dict):
     return False
 
 
+'''
+    获取父span的时间参数
+'''
 def get_outbound_time(span_json, spans_dict):
     outbound_timestamp = None
     outbound_latency = None
@@ -323,6 +344,7 @@ def get_outbound_time(span_json, spans_dict):
     return outbound_timestamp, outbound_latency
 
 
+'''使用jaeger的时钟调整'''
 def clock_skew_adjust(span_json):
     if span_json['warnings'] != None:
         for warning in span_json['warnings']:
@@ -330,8 +352,10 @@ def clock_skew_adjust(span_json):
                 adjust_flag = warning.split(' ')[-1][-2:]
                 adjust_time = float(warning.split(' ')[-1].strip('µms'))
                 if adjust_flag == 'ms':
+                    print(span_json['traceID'] + str(adjust_time * 1000))
                     return int(adjust_time * 1000)
                 elif adjust_flag == 'µs':
+                    print(span_json['traceID'] + str(adjust_time))
                     return int(adjust_time)
     else:
         return 0
