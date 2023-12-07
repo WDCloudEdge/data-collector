@@ -175,24 +175,39 @@ def collect_pod_num(config: Config, _dir: str):
     qps_sql = 'count(kube_pod_info{namespace="%s"}) by (created_by_name)' % config.namespace
     response = prom_util.execute_prom(config.prom_range_url_node, qps_sql)
 
-    def handle(result, instance_df):
+    for result in response:
         if 'created_by_name' in result['metric']:
-            name = result['metric']['created_by_name'][:result['metric']['created_by_name'].rfind('-')] + '&count'
+            # name = result['metric']['created_by_name'][:result['metric']['created_by_name'].rfind('-')] + '&count'
+            name = result['metric']['created_by_name']
             values = result['values']
             values = list(zip(*values))
-            if 'timestamp' not in instance_df:
-                timestamp = values[0]
-                instance_df['timestamp'] = timestamp
-                instance_df['timestamp'] = instance_df['timestamp'].astype('datetime64[s]')
-            metric = values[1]
-            instance_df[name] = pd.Series(metric)
-            instance_df[name] = instance_df[name].fillna(0)
-            instance_df[name] = instance_df[name].astype('float64')
+            deployment_df = pd.DataFrame()
+            timestamp = values[0]
+            deployment_df['timestamp'] = timestamp
+            deployment_df['timestamp'] = deployment_df['timestamp'].astype('datetime64[s]')
+            metric = pd.Series(values[1])
+            deployment_df[name] = metric
+            deployment_df = deployment_df.fillna(0)
+            deployment_df[name] = deployment_df[name].astype('float64')
+            if instance_df.empty:
+                instance_df = deployment_df
+            else:
+                instance_df = pd.merge(instance_df, deployment_df, on='timestamp', how='outer')
+            instance_df = instance_df.fillna(0)
 
-    [handle(result, instance_df) for result in response]
+    instance_num_df = pd.DataFrame()
+    for column in instance_df.columns:
+        if column == 'timestamp':
+            continue
+        name = column[:column.rfind('-')] + '&count'
+        if name not in instance_num_df.columns:
+            instance_num_df[name] = instance_df[column]
+        else:
+            instance_num_df[name] = instance_num_df[name] + instance_df[column]
+    instance_num_df['timestamp'] = instance_df['timestamp']
 
     path = os.path.join(_dir, 'instances_num.csv')
-    instance_df.to_csv(path, index=False, mode='a')
+    instance_num_df.to_csv(path, index=False, mode='a')
 
 
 # get qps for microservice
