@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tcpdump-raven0-daemonset
+  namespace: tcpdump
+  labels:
+    app: tcpdump-raven0
+spec:
+  selector:
+    matchLabels:
+      app: tcpdump-raven0
+  template:
+    metadata:
+      labels:
+        app: tcpdump-raven0
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: type
+                    operator: NotIn
+                    values:
+                      - virtual-kubelet
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+      hostNetwork: true
+      containers:
+        - name: tcpdump-raven0
+          image: corfr/tcpdump:latest
+          securityContext:
+            privileged: true  # 赋予容器特权以进行网络抓包
+          args:
+            - -tttt
+            - -i
+            - raven0
+            - -w
+            - /data/raven0.pcap
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+      volumes:
+        - name: data-volume
+          hostPath:
+            path: /home/tcpdump/raven0/log

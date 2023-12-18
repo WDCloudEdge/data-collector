@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tcpdump-raven0-filter-daemonset
+  namespace: tcpdump
+  labels:
+    app: tcpdump-raven0-filter
+spec:
+  selector:
+    matchLabels:
+      app: tcpdump-raven0-filter
+  template:
+    metadata:
+      labels:
+        app: tcpdump-raven0-filter
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: type
+                    operator: NotIn
+                    values:
+                      - virtual-kubelet
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+      hostNetwork: true
+      initContainers:
+        - name: create-directories
+          image: busybox
+          command: [ "/bin/sh", "-c", "mkdir -p /home/11_21" ]
+          volumeMounts:
+            - name: filter-data-volume
+              mountPath: /home
+      containers:
+        - name: tcpdump-raven0-filter
+          image: corfr/tcpdump:latest
+          securityContext:
+            privileged: true  # 赋予容器特权以进行网络抓包
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - >
+              tcpdump -r /data/raven0.pcap | awk -F" " '/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]\.[0-9]+/ && $1 > "2023-11-25 13:10:00" && $1 < "2023-11-25 14:10:00" {print}' > /home/11_21/test-normal.log && while true; do sleep 10 && echo '1'; done
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+            - name: filter-data-volume
+              mountPath: /home
+            - name: timezone-volume
+              mountPath: /etc/localtime
+      volumes:
+        - name: data-volume
+          hostPath:
+            path: /home/tcpdump/raven0/log
+            type: Directory
+        - name: filter-data-volume
+          hostPath:
+            path: /home/data_log
+            type: Directory
+        - name: timezone-volume
+          hostPath:
+            path: /etc/localtime
