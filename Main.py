@@ -32,7 +32,11 @@ if __name__ == "__main__":
             if config.end > end_time:
                 config.end = end_time
             print('第' + str(count) + '次获取 [' + config.namespace + '] 数据')
-            MetricCollector.collect(config, data_folder)
+            if count == 1:
+                is_header = True
+            else:
+                is_header = False
+            MetricCollector.collect(config, data_folder, is_header)
             Trace.collect(config, data_folder)
             now_time += config.duration + 1
             config.pods.clear()
@@ -46,7 +50,11 @@ if __name__ == "__main__":
         config.end = int(round(now_time + config.duration))
         if config.end > end_time:
             config.end = end_time
+        if count == 1:
+            is_header = True
+        else:
+            is_header = False
         print('第' + str(count) + '次获取 [' + 'node' + '] 数据')
-        MetricCollector.collect_node(config, data_folder)
+        MetricCollector.collect_node(config, data_folder, is_header)
         now_time += config.duration + 1
         count += 1

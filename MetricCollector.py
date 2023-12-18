@@ -5,7 +5,7 @@ from util.PrometheusClient import PrometheusClient
 from util.KubernetesClient import KubernetesClient
 
 
-def collect_graph(config: Config, _dir: str):
+def collect_graph(config: Config, _dir: str, is_header: bool):
     graph_df = pd.DataFrame(columns=['source', 'destination'])
     prom_util = PrometheusClient(config)
     prom_sql = 'sum(istio_tcp_received_bytes_total{destination_workload_namespace=\"%s\"}) by (source_workload, destination_workload)' % config.namespace
@@ -54,11 +54,11 @@ def collect_graph(config: Config, _dir: str):
     graph_df['timestamp'] = graph_df['timestamp'].astype('datetime64[s]')
     graph_df = graph_df.sort_values(by='timestamp', ascending=True)
     path = os.path.join(_dir, 'graph.csv')
-    graph_df.to_csv(path, index=False, mode='a')
+    graph_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
 # Get the response time of the invocation edges
-def collect_call_latency(config: Config, _dir: str):
+def collect_call_latency(config: Config, _dir: str, is_header: bool):
     call_df = pd.DataFrame()
 
     prom_util = PrometheusClient(config)
@@ -89,11 +89,11 @@ def collect_call_latency(config: Config, _dir: str):
     [handle(result, call_df, 'p99') for result in responses_99]
 
     path = os.path.join(_dir, 'call.csv')
-    call_df.to_csv(path, index=False, mode='a')
+    call_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
 # Get the response time for the microservices
-def collect_svc_latency(config: Config, _dir: str):
+def collect_svc_latency(config: Config, _dir: str, is_header: bool):
     latency_df = pd.DataFrame()
 
     prom_util = PrometheusClient(config)
@@ -124,11 +124,11 @@ def collect_svc_latency(config: Config, _dir: str):
     [handle(result, latency_df, 'p99') for result in responses_99]
 
     path = os.path.join(_dir, 'latency.csv')
-    latency_df.to_csv(path, index=False, mode='a')
+    latency_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
 # 获取机器的vCPU和memory使用
-def collect_resource_metric(config: Config, _dir: str):
+def collect_resource_metric(config: Config, _dir: str, is_header: bool):
     metric_df = pd.DataFrame()
     vCPU_sql = 'sum(rate(container_cpu_usage_seconds_total{image!="",namespace="%s"}[1m]))' % config.namespace
     mem_sql = 'sum(rate(container_memory_usage_bytes{image!="",namespace="%s"}[1m])) / (1024*1024)' % config.namespace
@@ -152,11 +152,11 @@ def collect_resource_metric(config: Config, _dir: str):
     [handle(result, metric_df, 'memory') for result in mem]
 
     path = os.path.join(_dir, 'resource.csv')
-    metric_df.to_csv(path, index=False, mode='a')
+    metric_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
 # Get the number of pods for all microservices
-def collect_pod_num(config: Config, _dir: str):
+def collect_pod_num(config: Config, _dir: str, is_header: bool):
     instance_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
     # qps_sql = 'count(container_cpu_usage_seconds_total{namespace="%s", container!~"POD|istio-proxy"}) by (container)' % (config.yaml.namespace)
@@ -207,11 +207,11 @@ def collect_pod_num(config: Config, _dir: str):
     instance_num_df['timestamp'] = instance_df['timestamp']
 
     path = os.path.join(_dir, 'instances_num.csv')
-    instance_num_df.to_csv(path, index=False, mode='a')
+    instance_num_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
 # get qps for microservice
-def collect_svc_qps(config: Config, _dir: str):
+def collect_svc_qps(config: Config, _dir: str, is_header: bool):
     qps_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
     qps_sql = 'sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[30s])) by (destination_workload)' % config.namespace
@@ -233,19 +233,19 @@ def collect_svc_qps(config: Config, _dir: str):
     [handle(result, qps_df) for result in response]
 
     path = os.path.join(_dir, 'svc_qps.csv')
-    qps_df.to_csv(path, index=False, mode='a')
+    qps_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
 # Get metric for microservices
-def collect_svc_metric(config: Config, _dir: str):
+def collect_svc_metric(config: Config, _dir: str, is_header: bool):
     prom_util = PrometheusClient(config)
     final_df = prom_util.get_svc_metric_range()
     path = os.path.join(_dir, 'svc_metric.csv')
-    final_df.to_csv(path, index=False, mode='a')
+    final_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
 # 收集容器CPU, memory, network
-def collect_ctn_metric(config: Config, _dir: str):
+def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     pod_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
 
@@ -358,12 +358,12 @@ def collect_ctn_metric(config: Config, _dir: str):
     df = pd.merge(cpu_df, mem_df, on='timestamp', how='outer')
     df = pd.merge(df, net_df, on='timestamp', how='outer')
     path = os.path.join(_dir, 'instance.csv')
-    df.to_csv(path, index=False, mode='a')
+    df.to_csv(path, index=False, mode='a', header=is_header)
     return df
 
 
 # Get the success rate for microservices
-def collect_succeess_rate(config: Config, _dir: str):
+def collect_succeess_rate(config: Config, _dir: str, is_header: bool):
     success_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
     success_rate_sql = '(sum(rate(istio_requests_total{reporter="destination", response_code!~"5.*",namespace="%s"}[1m])) by (destination_workload, destination_workload_namespace) / sum(rate(istio_requests_total{reporter="destination",namespace="%s"}[1m])) by (destination_workload, destination_workload_namespace))' % (
@@ -385,10 +385,10 @@ def collect_succeess_rate(config: Config, _dir: str):
     [handle(result, success_df) for result in response]
 
     path = os.path.join(_dir, 'success_rate.csv')
-    success_df.to_csv(path, index=False, mode='a')
+    success_df.to_csv(path, index=False, mode='a', header=is_header)
 
 
-def collect_node_metric(config: Config, _dir: str):
+def collect_node_metric(config: Config, _dir: str, is_header: bool):
     df = pd.DataFrame()
     prom_util = PrometheusClient(config)
     for node in KubernetesClient(config).get_nodes():
@@ -471,30 +471,30 @@ def collect_node_metric(config: Config, _dir: str):
         df = df.fillna(0)
 
     path = os.path.join(_dir, 'node.csv')
-    df.to_csv(path, index=False, mode='a')
+    df.to_csv(path, index=False, mode='a', header=is_header)
 
     return df
 
 
-def collect(config: Config, _dir: str):
+def collect(config: Config, _dir: str, is_header: bool):
     print('collect metrics')
     # 建立文件夹
     if not os.path.exists(_dir):
         os.makedirs(_dir)
     # 收集各种数据
-    collect_graph(config, _dir)
-    collect_call_latency(config, _dir)
-    collect_svc_latency(config, _dir)
-    collect_resource_metric(config, _dir)
-    collect_succeess_rate(config, _dir)
-    collect_svc_qps(config, _dir)
-    collect_svc_metric(config, _dir)
-    collect_pod_num(config, _dir)
-    collect_ctn_metric(config, _dir)
+    collect_graph(config, _dir, is_header)
+    collect_call_latency(config, _dir, is_header)
+    collect_svc_latency(config, _dir, is_header)
+    collect_resource_metric(config, _dir, is_header)
+    collect_succeess_rate(config, _dir, is_header)
+    collect_svc_qps(config, _dir, is_header)
+    collect_svc_metric(config, _dir, is_header)
+    collect_pod_num(config, _dir, is_header)
+    collect_ctn_metric(config, _dir, is_header)
 
 
-def collect_node(config: Config, _dir: str):
+def collect_node(config: Config, _dir: str, is_header: bool):
     print('collect node metrics')
     if not os.path.exists(_dir):
         os.makedirs(_dir)
-    collect_node_metric(config, _dir)
+    collect_node_metric(config, _dir, is_header)
