@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 is_header = False
             MetricCollector.collect(config, data_folder, is_header)
             Trace.collect(config, data_folder)
-            now_time += config.duration + 1
+            now_time += config.duration + config.step
             config.pods.clear()
             count += 1
     data_folder = './data/' + str(config.user) + '/node'
@@ -56,5 +56,5 @@ if __name__ == "__main__":
             is_header = False
         print('第' + str(count) + '次获取 [' + 'node' + '] 数据')
         MetricCollector.collect_node(config, data_folder, is_header)
-        now_time += config.duration + 1
+        now_time += config.duration + config.step
         count += 1
