@@ -1,65 +1,101 @@
+import json
+import os
 import time
-from threading import Thread
+from kubernetes import client, config
 
-import numpy as np
-from kubernetes import client, config, watch
-from util.PrometheusClient import PrometheusClient
-from Config import Config
-import pandas as pd
-
-prom_util = PrometheusClient(Config())
-specified_namespace = "default"
 config.load_kube_config()
-prom_url = "http://47.99.240.112:31222/api/v1/query"
-def pull_and_store(pod_name,reason,delete_time):
-    metrics = ['kube_pod_created', 'kube_pod_status_scheduled_time', 'kube_pod_start_time','kube_pod_status_initialized_time',
-                'kube_pod_status_container_ready_time', 'kube_pod_status_ready_time','kube_pod_deletion_timestamp']
-    extra_metrics = ['created-scheduled','scheduled_start','start_initialized','initialized_ready','delete_cost']
-    prom_sql = 'last_over_time(kube_pod_deletion_timestamp{pod="%s"}[10m])' %pod_name
-
-    cnt = 1
-    while prom_util.execute_prom(prom_url, prom_sql) == []:
-        time.sleep(5*cnt)
-        cnt+=1
-        if cnt > 15:
-            print("Collect_data_from_prometheus_error: "+pod_name)
-            return
-
-    datas = [pod_name]
-    for metric in metrics:
-        prom_sql = 'last_over_time(%s{pod="%s"}[10m])' % (metric, pod_name)
-        response = prom_util.execute_prom(prom_url, prom_sql)
-        if response != []:
-            datas.append(int(response[0]['value'][1]))
-        else:
-            datas.append(0)
-            print("Empty metric: "+pod_name+" "+metric)
-    for i in range(1,5):
-        if datas[i]!=0 and datas[i+1]!=0:
-            datas.append(datas[i+1]-datas[i])
-        else:
-            datas.append(-1)
-    datas.append(datas[7]-delete_time)
-    df = pd.DataFrame(data=np.array(datas).reshape(1,13),columns = ["pod_name"]+metrics+extra_metrics)
-    with open('pod-metrics.csv', mode="a") as f:
-        df.to_csv(f, header=f.tell() == 0, index=False)
-    print("Pod metrics collected: "+ pod_name)
-
-
-
 v1 = client.CoreV1Api()
-w = watch.Watch()
-end_time = time.time()+ 3
-for event in w.stream(v1.list_namespaced_event,specified_namespace):
-#for event in w.stream(v1.list_event_for_all_namespaces):
-    if time.time() < end_time:
-        continue
-    print(event)
-    if event['object'].reason == "Killing":
-        pod_name = event['object'].involved_object.name
-        print("Pod " + event['object'].reason + " detected: " + pod_name)
-        Thread(target=pull_and_store, args=(pod_name,event['object'].reason,int(event['object'].first_timestamp.timestamp()))).start()
 
+specified_namespace = "default"
+time_format = "%Y-%m-%d %H:%M:%S"
+interval = 5
+data = {}
+deleted = {}
+while True:
+    api_response = v1.list_namespaced_pod(specified_namespace, pretty=True)
+    for pod in api_response.items:
+        pod_name = pod.metadata.name
+        if pod_name in deleted:
+            continue
+        if pod_name not in data:
+            data[pod_name] = {}
+            data[pod_name]["pod_name"] = pod_name
+            data[pod_name]['creation_timestamp'] = pod.metadata.creation_timestamp.strftime(time_format)
+            data[pod_name]['conditions'] = {}
+            if pod.metadata.owner_references:
+                data[pod_name]['owner_kind'] = pod.metadata.owner_references[0].kind
+                data[pod_name]['owner_name'] = pod.metadata.owner_references[0].name
+            else:
+                data[pod_name]['owner_kind'] = None
+                data[pod_name]['owner_name'] = None
 
+        if pod.status.conditions:
+            for condition in pod.status.conditions:
+                if condition.type in ["Initialized", "PodScheduled"]:
+                    if condition.type not in data[pod_name]:
+                        data[pod_name][condition.type] = condition.last_transition_time.strftime(time_format)
+                    continue
+                if condition.type not in data[pod_name]['conditions'] or condition.status != \
+                        data[pod_name]['conditions'][condition.type]:
+                    data[pod_name]['conditions'][condition.type] = condition.status
+                    if condition.status == "True":
+                        if condition.type not in data[pod_name]:
+                            data[pod_name][condition.type] = []
+                        data[pod_name][condition.type].append(
+                            {'start': condition.last_transition_time.strftime(time_format), 'end': None,
+                             'duration': None})
+                    else:
+                        if condition.type in data[pod_name]:
+                            data[pod_name][condition.type][-1]['end'] = condition.last_transition_time.strftime(
+                                time_format)
+                            data[pod_name][condition.type][-1]['duration'] = int(
+                                condition.last_transition_time.timestamp()) - int(time.mktime(
+                                time.strptime(data[pod_name][condition.type][-1]['start'], time_format))) - int(
+                                time.time() - time.mktime(time.gmtime()))
+        if 'container_started_at' not in data[pod_name]:
+            data[pod_name]['container_started_at'] = {}
+        if pod.status.container_statuses:
+            for container in pod.status.container_statuses:
+                if container.name not in data[pod_name]['container_started_at']:
+                    data[pod_name]['container_started_at'][container.name] = []
+                if container.state.running and hasattr(container.state.running, 'started_at'):
+                    if not data[pod_name]['container_started_at'][
+                        container.name] or container.state.running.started_at.strftime(time_format) != \
+                            data[pod_name]['container_started_at'][container.name][-1]:
+                        data[pod_name]['container_started_at'][container.name].append(
+                            container.state.running.started_at.strftime(time_format))
 
-
+        if pod.metadata.deletion_timestamp is not None:
+            data[pod_name]['deletion_timestamp'] = pod.metadata.deletion_timestamp.strftime(time_format)
+            data[pod_name]['cost'] = {}
+            for key in data[pod_name]['conditions']:
+                if key in data[pod_name] and data[pod_name][key]:
+                    data[pod_name]['cost'][key + "_cost_total"] = int(
+                        time.mktime(time.strptime(data[pod_name][key][0]['start'], time_format))) - int(
+                        time.mktime(time.strptime(data[pod_name]['creation_timestamp'], time_format)))
+            condition = ['PodScheduled', 'Initialized', 'ContainersReady', 'Ready']
+            for i in range(1, 4):
+                if condition[i - 1] in data[pod_name] and data[pod_name][condition[i - 1]] != [] and condition[i] in \
+                        data[pod_name] and data[pod_name][condition[i]] != []:
+                    start_time = data[pod_name][condition[i - 1]] if condition[i - 1] in ["Initialized",
+                                                                                          "PodScheduled"] else \
+                        data[pod_name][condition[i - 1]][0]['start']
+                    end_time = data[pod_name][condition[i]] if condition[i] in ["Initialized", "PodScheduled"] else \
+                        data[pod_name][condition[i]][0]['start']
+                    print(start_time)
+                    print(end_time)
+                    data[pod_name]['cost'][condition[i - 1] + "-" + condition[i]] = int(
+                        time.mktime(time.strptime(end_time, time_format))) - int(
+                        time.mktime(time.strptime(start_time, time_format)))
+            if os.path.exists('pod-metrics.json'):
+                with open('pod-metrics.json', mode="a") as f:
+                    f.write(",\n")
+                    json.dump(data[pod_name], f, indent=2, sort_keys=False)
+            else:
+                with open('pod-metrics.json', mode="w") as f:
+                    f.write("[")
+                    json.dump(data[pod_name], f, indent=2, sort_keys=False)
+            data.pop(pod_name)
+            print(pod_name + " data collected")
+            deleted[pod_name] = True
+    time.sleep(interval)
