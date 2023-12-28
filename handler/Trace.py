@@ -394,8 +394,8 @@ def get_latency(trace_list):
                     send_latency = trace['timestamp'][2 * i + 1] - trace['timestamp'][2 * i]
                     res_latency = (trace['timestamp'][2 * i] + trace['latency'][2 * i]) - (trace['timestamp'][2 * i + 1] + trace['latency'][2 * i + 1])
                     # 如果发包或出包的时间为负数，则将其舍去
-                    if send_latency < 0 or res_latency < 0:
-                        continue
+                    # if send_latency < 0 or res_latency < 0:
+                    #     continue
                     net_latency_list.append((send_latency, res_latency))
                     net_latency[latency_key] = net_latency_list
                     # 处理pod_latency
