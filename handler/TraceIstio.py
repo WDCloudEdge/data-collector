@@ -320,7 +320,13 @@ def clock_skew_adjust(span_json):
     if span_json['warnings'] != None:
         for warning in span_json['warnings']:
             if 'clock skew adjustment' in warning:
-                adjust_time = float(warning.split(' ')[-1].strip('ms'))
-                return int(adjust_time * 1000)
+                adjust_flag = warning.split(' ')[-1][-2:]
+                adjust_time = float(warning.split(' ')[-1].strip('µms'))
+                if adjust_flag == 'ms':
+                    return int(adjust_time * 1000)
+                elif adjust_flag == 'µs':
+                    return int(adjust_time)
+                else:
+                    return 0
     else:
         return 0

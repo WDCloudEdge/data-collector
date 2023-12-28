@@ -352,11 +352,11 @@ def clock_skew_adjust(span_json):
                 adjust_flag = warning.split(' ')[-1][-2:]
                 adjust_time = float(warning.split(' ')[-1].strip('µms'))
                 if adjust_flag == 'ms':
-                    print(span_json['traceID'] + str(adjust_time * 1000))
                     return int(adjust_time * 1000)
                 elif adjust_flag == 'µs':
-                    print(span_json['traceID'] + str(adjust_time))
                     return int(adjust_time)
+                else:
+                    return 0
     else:
         return 0
 
