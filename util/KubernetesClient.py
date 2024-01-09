@@ -109,7 +109,7 @@ class KubernetesClient:
         return result
 
     def get_all_svc(self):
-        namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
+        namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test', 'trainticket']
         namespace_svc_dict = {}
         for namespace in namespaces:
             responses = self.core_api.list_namespaced_service(namespace)

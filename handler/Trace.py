@@ -17,6 +17,8 @@ def collect(config: Config, _dir: str):
             'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
     if config.namespace == 'horsecoder-test':
         svcs = ['edge-llm-svc', 'edge-paraformer-serverless-svc', 'edge-gateway-svc']
+    elif config.namespace == 'trainticket':
+        svcs = KubernetesClient(config).get_svc_list_name()
     global global_svcs
     global_svcs = svcs
     # urls = build_trace_urls(config)
@@ -32,7 +34,7 @@ def collect(config: Config, _dir: str):
 
     # 遍历服务，收集各类trace数据
     for svc in svcs:
-        if config.namespace == 'cloud-sock-shop':
+        if config.namespace == 'cloud-sock-shop' or config.namespace == 'trainticket':
             url = build_trace_url(config, svc)
             normal_dict, inbound_dict, outbound_dict, abnormal_dict, inbound_half_dict, outbound_half_dict, abnormal_half_dict = handle_traces_no_istio(pull(url), config)
         elif config.namespace == 'horsecoder-test':
@@ -48,8 +50,11 @@ def collect(config: Config, _dir: str):
         inbound_half_dicts = {**inbound_half_dicts, **inbound_half_dict}
         outbound_half_dicts = {**outbound_half_dicts, **outbound_half_dict}
         abnormal_half_dicts = {**abnormal_half_dicts, **abnormal_half_dict}
+
+    # print(normal_dicts)
     # 处理pod_latency和net_latency数据
     pod_latency, net_latency = get_latency([normal_dicts, abnormal_dicts])
+    # print(net_latency)
 
     # 将数据持久化
     normal_path = _dir + '/' + 'normal.pkl'

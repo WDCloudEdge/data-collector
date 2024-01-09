@@ -274,8 +274,8 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
             pod_df = pd.merge(pod_df, container_df, on='timestamp', how='outer')
         pod_df = pod_df.fillna(0)
 
-    prom_cpu_sql = 'sum(rate(container_cpu_usage_seconds_total{namespace=\'%s\',container!~\'POD|istio-proxy|\',pod!~\'jaeger.*\'}[1m])* 1000)  by (pod, instance, container)' % config.namespace
-    prom_memory_sql = 'sum(container_memory_working_set_bytes{namespace=\'%s\',container!~\'POD|istio-proxy|\',pod!~\'jaeger.*\'}) by(pod, instance, container)  / 1000000' % (
+    prom_cpu_sql = 'sum(rate(container_cpu_usage_seconds_total{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}[1m])* 1000)  by (pod, instance, container)' % config.namespace
+    prom_memory_sql = 'sum(container_memory_working_set_bytes{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}) by(pod, instance, container)  / 1000000' % (
         config.namespace)
     response = prom_util.execute_prom(config.prom_range_url_node, prom_cpu_sql)
     cpu_rename = {}

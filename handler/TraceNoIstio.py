@@ -305,7 +305,7 @@ def get_svc_namespace(svc):
 def handle_node_id_no_istio(node_name, node_id, namespace):
     if node_name == 'OTHER_NODE':
         return 'OTHER_NODE'
-    return node_name + '.' + namespace + '-' + node_id
+    return str(node_name) + '.' + str(namespace) + '-' + node_id
 
 
 '''
@@ -349,13 +349,16 @@ def clock_skew_adjust(span_json):
     if span_json['warnings'] != None:
         for warning in span_json['warnings']:
             if 'clock skew adjustment' in warning:
-                adjust_flag = warning.split(' ')[-1][-2:]
-                adjust_time = float(warning.split(' ')[-1].strip('µms'))
-                if adjust_flag == 'ms':
-                    return int(adjust_time * 1000)
-                elif adjust_flag == 'µs':
-                    return int(adjust_time)
-                else:
+                try:
+                    adjust_flag = warning.split(' ')[-1][-2:]
+                    adjust_time = float(warning.split(' ')[-1].strip('µms'))
+                    if adjust_flag == 'ms':
+                        return int(adjust_time * 1000)
+                    elif adjust_flag == 'µs':
+                        return int(adjust_time)
+                    else:
+                        return 0
+                except Exception:
                     return 0
     else:
         return 0
