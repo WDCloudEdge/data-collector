@@ -4,14 +4,15 @@ import MetricCollector
 from handler import Trace
 import time
 
+
 if __name__ == "__main__":
-    namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
-    # namespaces = ['hipster']
+    # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
+    namespaces = ['bookinfo']
     config = Config()
     # 需要更改的部分
-    config.user = "normal-240110-2130-240111-1130"
-    now_time_string = "2024-01-10 21:30:00"
-    end_time_string = "2024-01-11 11:30:00"
+    config.user = "test"
+    now_time_string = "2024-01-11 00:00:00"
+    end_time_string = "2024-01-11 00:30:00"
 
     now_time_array = time.strptime(now_time_string, "%Y-%m-%d %H:%M:%S")
     end_time_array = time.strptime(end_time_string, "%Y-%m-%d %H:%M:%S")
@@ -47,6 +48,8 @@ if __name__ == "__main__":
             now_time += config.duration + config.step
             config.pods.clear()
             count += 1
+        # 将trace数据合并，写入到原文件中
+        pkl_concat.data_concat(data_folder, data_folder)
     data_folder = './data/' + str(config.user) + '/node'
     count = 1
     now_time = global_now_time
