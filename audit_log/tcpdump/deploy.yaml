@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: tcpdump-raven0-daemonset
-  namespace: tcpdump
+  namespace: audit-log
   labels:
     app: tcpdump-raven0
 spec:
@@ -29,6 +29,13 @@ spec:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
       hostNetwork: true
+      initContainers:
+        - name: create-directories
+          image: busybox
+          command: [ "/bin/sh", "-c", "mkdir -p /data" ]
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
       containers:
         - name: tcpdump-raven0
           image: corfr/tcpdump:latest

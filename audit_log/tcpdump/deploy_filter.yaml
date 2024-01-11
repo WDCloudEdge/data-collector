@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: tcpdump-raven0-filter-daemonset
-  namespace: tcpdump
+  namespace: audit-log
   labels:
     app: tcpdump-raven0-filter
 spec:
