@@ -5,12 +5,18 @@ from handler import Trace
 import time
 
 if __name__ == "__main__":
-    # namespaces = ['bookinfo', 'hipster', 'hipster2', 'sock-shop', 'horsecoder-test', 'horsecoder-minio']
-    namespaces = ['bookinfo']
+    namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
+    # namespaces = ['hipster']
     config = Config()
+    # 需要更改的部分
+    config.user = "normal-240110-2130-240111-1130"
+    now_time_string = "2024-01-10 21:30:00"
+    end_time_string = "2024-01-11 11:30:00"
 
-    global_now_time = 1701319560
-    global_end_time = 1701320160
+    now_time_array = time.strptime(now_time_string, "%Y-%m-%d %H:%M:%S")
+    end_time_array = time.strptime(end_time_string, "%Y-%m-%d %H:%M:%S")
+    global_now_time = int(time.mktime(now_time_array))
+    global_end_time = int(time.mktime(end_time_array))
     now = int(time.time())
     if global_now_time > now:
         sys.exit("begin time is after now time")
