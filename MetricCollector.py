@@ -8,11 +8,12 @@ from util.KubernetesClient import KubernetesClient
 def collect_graph(config: Config, _dir: str, is_header: bool):
     graph_df = pd.DataFrame(columns=['source', 'destination'])
     prom_util = PrometheusClient(config)
-    prom_sql = 'sum(istio_tcp_received_bytes_total{destination_workload_namespace=\"%s\"}) by (source_workload, destination_workload)' % config.namespace
-    results = prom_util.execute_prom(config.prom_range_url, prom_sql)
+    # prom_sql = 'sum(istio_tcp_received_bytes_total{destination_workload_namespace=\"%s\"}) by (source_workload, destination_workload)' % config.namespace
+    # results = prom_util.execute_prom(config.prom_range_url, prom_sql)
 
     prom_sql = 'sum(istio_requests_total{destination_workload_namespace=\"%s\"}) by (source_workload, destination_workload)' % config.namespace
-    results = results + prom_util.execute_prom(config.prom_range_url, prom_sql)
+    results = prom_util.execute_prom(config.prom_range_url, prom_sql)
+    # results = results + prom_util.execute_prom(config.prom_range_url, prom_sql)
 
     for result in results:
         metric = result['metric']
@@ -49,7 +50,7 @@ def collect_graph(config: Config, _dir: str, is_header: bool):
                 new_row = pd.DataFrame({'source': [source], 'destination': [destination], 'timestamp': [timestamp]})
                 graph_df = pd.concat([graph_df, new_row], ignore_index=True)
                 # graph_df = graph_df.append({'source': source, 'destination': destination, 'timestamp': timestamp},
-                                           # ignore_index=True)
+                #                             ignore_index=True)
 
     graph_df['timestamp'] = graph_df['timestamp'].astype('datetime64[s]')
     graph_df = graph_df.sort_values(by='timestamp', ascending=True)
@@ -273,6 +274,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         else:
             pod_df = pd.merge(pod_df, container_df, on='timestamp', how='outer')
         pod_df = pod_df.fillna(0)
+    # pod_df.drop('horsecoder-platform-permission-deployment-5db788d895-pxk9g', axis = 1, inplace=True)
 
     prom_cpu_sql = 'sum(rate(container_cpu_usage_seconds_total{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}[1m])* 1000)  by (pod, instance, container)' % config.namespace
     prom_memory_sql = 'sum(container_memory_working_set_bytes{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}) by(pod, instance, container)  / 1000000' % (
