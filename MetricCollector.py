@@ -277,6 +277,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
             pod_df = pd.merge(pod_df, container_df, on='timestamp', how='outer')
         pod_df = pod_df.fillna(0)
     pod_df = pod_df.sort_values(by='timestamp')
+    pod_df = pod_df.reset_index(drop=True)
 
     prom_cpu_sql = 'sum(rate(container_cpu_usage_seconds_total{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}[1m])* 1000)  by (pod, instance, container)' % config.namespace
     prom_memory_sql = 'sum(container_memory_working_set_bytes{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}) by(pod, instance, container)  / 1000000' % (
@@ -307,6 +308,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
             cpu_df = pd.merge(cpu_df, container_df, on='timestamp', how='outer')
         cpu_df = cpu_df.fillna(0)
     cpu_df = cpu_df.sort_values(by='timestamp')
+    cpu_df = cpu_df.reset_index(drop=True)
     cpu_df = cpu_df.mask((cpu_df == 0) & (pod_df == 0), -1)
     cpu_df.rename(columns=cpu_rename, inplace=True)
 
@@ -336,6 +338,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
             mem_df = pd.merge(mem_df, container_df, on='timestamp', how='outer')
         mem_df = mem_df.fillna(0)
     mem_df = mem_df.sort_values(by='timestamp')
+    mem_df = mem_df.reset_index(drop=True)
     mem_df = mem_df.mask((mem_df == 0) & (pod_df == 0), -1)
     mem_df.rename(columns=mem_rename, inplace=True)
 
@@ -365,6 +368,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
             net_df = pd.merge(net_df, container_df, on='timestamp', how='outer')
         net_df = net_df.fillna(0)
     net_df = net_df.sort_values(by='timestamp')
+    net_df = net_df.reset_index(drop=True)
     net_df = net_df.mask((net_df == 0) & (pod_df == 0), -1)
     net_df.rename(columns=net_rename, inplace=True)
 
