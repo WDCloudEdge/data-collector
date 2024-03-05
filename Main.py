@@ -1,4 +1,6 @@
 import sys
+
+import pkl_concat
 from Config import Config
 import MetricCollector
 from handler import Trace
@@ -6,13 +8,13 @@ import time
 
 
 if __name__ == "__main__":
-    # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
-    namespaces = ['bookinfo']
+    namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
+    # namespaces = ['horsecoder-test']
     config = Config()
     # 需要更改的部分
-    config.user = "test"
-    now_time_string = "2024-01-11 00:00:00"
-    end_time_string = "2024-01-11 00:30:00"
+    config.user = "normal-240206-1822-1922"
+    now_time_string = "2024-02-06 18:22:00"
+    end_time_string = "2024-02-06 19:22:00"
 
     now_time_array = time.strptime(now_time_string, "%Y-%m-%d %H:%M:%S")
     end_time_array = time.strptime(end_time_string, "%Y-%m-%d %H:%M:%S")

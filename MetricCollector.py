@@ -254,6 +254,8 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     response = prom_util.execute_prom(config.prom_range_url_node, pod_info_sql)
     for result in response:
         pod_name = result['metric']['pod']
+        if 'horsecoder-pay' in pod_name:
+            continue
         values = result['values']
         values = list(zip(*values))
         container_df = pd.DataFrame()
@@ -274,7 +276,6 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         else:
             pod_df = pd.merge(pod_df, container_df, on='timestamp', how='outer')
         pod_df = pod_df.fillna(0)
-    # pod_df.drop('horsecoder-platform-permission-deployment-5db788d895-pxk9g', axis = 1, inplace=True)
 
     prom_cpu_sql = 'sum(rate(container_cpu_usage_seconds_total{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}[1m])* 1000)  by (pod, instance, container)' % config.namespace
     prom_memory_sql = 'sum(container_memory_working_set_bytes{namespace=\'%s\',container!~\'POD|istio-proxy|\',container!~\'POD|rabbitmq-exporter|\',pod!~\'jaeger.*\'}) by(pod, instance, container)  / 1000000' % (
@@ -284,6 +285,8 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     cpu_df = pd.DataFrame()
     for result in response:
         pod_name = result['metric']['pod']
+        if 'horsecoder-pay' in pod_name:
+            continue
         config.pods.add(pod_name)
         values = result['values']
         values = list(zip(*values))
@@ -310,6 +313,8 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     response = prom_util.execute_prom(config.prom_range_url_node, prom_memory_sql)
     for result in response:
         pod_name = result['metric']['pod']
+        if 'horsecoder-pay' in pod_name:
+            continue
         config.pods.add(pod_name)
         container_df = pd.DataFrame()
         values = result['values']
@@ -334,6 +339,8 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     net_rename = {}
     net_df = pd.DataFrame()
     for pod_name in config.pods:
+        if 'horsecoder-pay' in pod_name:
+            continue
         prom_network_sql = 'sum(rate(container_network_transmit_packets_total{namespace=\"%s\", pod="%s"}[1m])) * sum(rate(container_network_transmit_packets_total{namespace=\"%s\", pod="%s"}[1m]))' % (
             config.namespace, pod_name, config.namespace, pod_name)
         response = prom_util.execute_prom(config.prom_range_url_node, prom_network_sql)

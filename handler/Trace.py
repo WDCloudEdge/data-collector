@@ -12,6 +12,7 @@ global_namespace_svcs_dict = {}
 def collect(config: Config, _dir: str):
     global global_namespace_svcs_dict
     global_namespace_svcs_dict = KubernetesClient(config).get_all_svc()
+    # config.svcs = KubernetesClient(config).get_svc_list_name()
     # 确定命名空间中需要访问的服务
     svcs = [svc for svc in config.svcs if
             'unknown' not in svc and 'redis' not in svc and 'istio-ingressgateway' not in svc]
