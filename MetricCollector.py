@@ -254,6 +254,9 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     response = prom_util.execute_prom(config.prom_range_url_node, pod_info_sql)
     for result in response:
         pod_name = result['metric']['pod']
+        container = result['metric']['container']
+        if 'istio' in container:
+            continue
         if 'horsecoder-pay' in pod_name:
             continue
         values = result['values']
@@ -287,6 +290,9 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     cpu_df = pd.DataFrame()
     for result in response:
         pod_name = result['metric']['pod']
+        container = result['metric']['container']
+        if 'istio' in container:
+            continue
         if 'horsecoder-pay' in pod_name:
             continue
         config.pods.add(pod_name)
@@ -317,6 +323,9 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     response = prom_util.execute_prom(config.prom_range_url_node, prom_memory_sql)
     for result in response:
         pod_name = result['metric']['pod']
+        container = result['metric']['container']
+        if 'istio' in container:
+            continue
         if 'horsecoder-pay' in pod_name:
             continue
         config.pods.add(pod_name)
