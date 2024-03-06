@@ -2,15 +2,18 @@ import json
 import os
 import time
 from kubernetes import client, config
+from threading import Thread
+import atexit
 
-config.load_kube_config()
+config.kube_config.load_kube_config(config_file='config.yaml')
 v1 = client.CoreV1Api()
 
 
-def watch_pods_lifecycle_specified_namespace(specified_namespace, folder, interval=5):
+def watch_pods_lifecycle_specified_namespace(specified_namespace, file_path, interval=5):
     time_format = "%Y-%m-%d %H:%M:%S"
     data = {}
     deleted = {}
+    atexit.register(dump_shutdown_hook, data, file_path)
     while True:
         api_response = v1.list_namespaced_pod(specified_namespace, pretty=True)
         for pod in api_response.items:
@@ -87,15 +90,53 @@ def watch_pods_lifecycle_specified_namespace(specified_namespace, folder, interv
                         data[pod_name]['cost'][condition[i - 1] + "-" + condition[i]] = int(
                             time.mktime(time.strptime(end_time, time_format))) - int(
                             time.mktime(time.strptime(start_time, time_format)))
-                if os.path.exists(folder + '/pod-metrics.json'):
-                    with open(folder + '/pod-metrics.json', mode="a") as f:
+                if os.path.exists(file_path):
+                    with open(file_path, mode="a") as f:
                         f.write(",\n")
                         json.dump(data[pod_name], f, indent=2, sort_keys=False)
                 else:
-                    with open(folder + '/pod-metrics.json', mode="w") as f:
+                    if not os.path.exists(folder):
+                        os.makedirs(folder)
+                    with open(file_path, mode="w") as f:
                         f.write("[")
                         json.dump(data[pod_name], f, indent=2, sort_keys=False)
                 data.pop(pod_name)
                 print(pod_name + " data collected")
                 deleted[pod_name] = True
         time.sleep(interval)
+
+
+def async_watch_pods_lifecycle_specified_namespace(specified_namespace, file_path, interval=5):
+    Thread(target=watch_pods_lifecycle_specified_namespace,
+           args=(specified_namespace, file_path, interval)).start()
+
+
+def dump_shutdown_hook(data, file_path):
+    if os.path.exists(file_path):
+        with open(file_path, mode="a") as f:
+            for pod_name in data:
+                f.write(",\n")
+                json.dump(data[pod_name], f, indent=2, sort_keys=False)
+            f.write("]")
+    else:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        with open(file_path, mode="w") as f:
+            count = 1
+            for pod_name in data:
+                if count == 1:
+                    f.write("[")
+                else:
+                    f.write(",\n")
+                json.dump(data[pod_name], f, indent=2, sort_keys=False)
+                count += 1
+            f.write("]")
+
+
+if __name__ == '__main__':
+    # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
+    namespaces = ['bookinfo']
+    folder = 'podLifecycle'
+    for namespace in namespaces:
+        file_path = folder + '/pod-metrics-' + namespace + '.json'
+        async_watch_pods_lifecycle_specified_namespace(namespace, file_path)

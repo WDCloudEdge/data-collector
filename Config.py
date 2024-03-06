@@ -16,6 +16,7 @@ class Config:
         # prometheus
         self.prom_range_url = "http://47.99.240.112:31444/api/v1/query_range"  # istio支持
         self.prom_range_url_node = "http://47.99.240.112:31222/api/v1/query_range"  # 原生Prometheus
+        self.prom_no_range_url_node = "http://47.99.240.112:31222/api/v1/query"
         self.prom_no_range_url = "http://47.99.240.112:31444/api/v1/query"
         self.step = 5
 
