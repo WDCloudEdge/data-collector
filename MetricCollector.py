@@ -499,14 +499,14 @@ def collect(config: Config, _dir: str, is_header: bool):
     if not os.path.exists(_dir):
         os.makedirs(_dir)
     # 收集各种数据
-    # collect_graph(config, _dir, is_header)
-    # collect_call_latency(config, _dir, is_header)
-    # collect_svc_latency(config, _dir, is_header)
-    # collect_resource_metric(config, _dir, is_header)
-    # collect_succeess_rate(config, _dir, is_header)
-    # collect_svc_qps(config, _dir, is_header)
-    # collect_svc_metric(config, _dir, is_header)
-    # collect_pod_num(config, _dir, is_header)
+    collect_graph(config, _dir, is_header)
+    collect_call_latency(config, _dir, is_header)
+    collect_svc_latency(config, _dir, is_header)
+    collect_resource_metric(config, _dir, is_header)
+    collect_succeess_rate(config, _dir, is_header)
+    collect_svc_qps(config, _dir, is_header)
+    collect_svc_metric(config, _dir, is_header)
+    collect_pod_num(config, _dir, is_header)
     collect_ctn_metric(config, _dir, is_header)
 
 
