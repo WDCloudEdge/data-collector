@@ -160,25 +160,11 @@ def collect_resource_metric(config: Config, _dir: str, is_header: bool):
 def collect_pod_num(config: Config, _dir: str, is_header: bool):
     instance_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
-    # qps_sql = 'count(container_cpu_usage_seconds_total{namespace="%s", container!~"POD|istio-proxy"}) by (container)' % (config.yaml.namespace)
-    # def handle(result, instance_df):
-    #     if 'container' in result['metric']:
-    #         name = result['metric']['container'] + '&count'
-    #         values = result['values']
-    #         values = list(zip(*values))
-    #         if 'timestamp' not in instance_df:
-    #             timestamp = values[0]
-    #             instance_df['timestamp'] = timestamp
-    #             instance_df['timestamp'] = instance_df['timestamp'].astype('datetime64[s]')
-    #         metric = values[1]
-    #         instance_df[name] = pd.Series(metric)
-    #         instance_df[name] = instance_df[name].astype('float64')
-    qps_sql = 'count(kube_pod_info{namespace="%s"}) by (created_by_name)' % config.namespace
-    response = prom_util.execute_prom(config.prom_range_url_node, qps_sql)
+    pod_sql = 'kube_pod_info{namespace="%s"}' % config.namespace
+    response = prom_util.execute_prom(config.prom_range_url_node, pod_sql)
 
     for result in response:
-        if 'created_by_name' in result['metric']:
-            # name = result['metric']['created_by_name'][:result['metric']['created_by_name'].rfind('-')] + '&count'
+        if 'created_by_name' in result['metric'] and 'pod_ip' in result['metric']:
             name = result['metric']['created_by_name']
             values = result['values']
             values = list(zip(*values))
@@ -253,32 +239,33 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
     pod_info_sql = 'kube_pod_info{namespace=\'%s\'}' % config.namespace
     response = prom_util.execute_prom(config.prom_range_url_node, pod_info_sql)
     for result in response:
-        pod_name = result['metric']['pod']
-        container = result['metric']['container']
-        if 'istio' in container:
-            continue
-        if 'horsecoder-pay' in pod_name:
-            continue
-        values = result['values']
-        values = list(zip(*values))
-        container_df = pd.DataFrame()
-        timestamp = values[0]
-        metric = pd.Series(values[1])
-        container_df['timestamp'] = timestamp
-        container_df['timestamp'] = container_df['timestamp'].astype('datetime64[s]')
-        container_df[pod_name] = metric
-        container_df = container_df.fillna(0)
-        container_df[pod_name] = container_df[pod_name].astype('float64')
-        if pod_df.empty:
-            pod_df = container_df
-        elif pod_name in pod_df.columns:
-            pod_df = pod_df.set_index('timestamp').combine_first(container_df.set_index('timestamp')).reset_index()
-            for i in range(len(container_df[pod_name])):
-                pod_df_index = pod_df.loc[pod_df['timestamp'] == container_df['timestamp'][i]].index[0]
-                pod_df.at[pod_df_index, pod_name] = 1 if pod_df[pod_name][pod_df_index] == 0 and container_df[pod_name][i] == 1 else pod_df[pod_name][pod_df_index]
-        else:
-            pod_df = pd.merge(pod_df, container_df, on='timestamp', how='outer')
-        pod_df = pod_df.fillna(0)
+        if 'created_by_name' in result['metric'] and 'pod_ip' in result['metric']:
+            pod_name = result['metric']['pod']
+            container = result['metric']['container']
+            if 'istio' in container:
+                continue
+            if 'horsecoder-pay' in pod_name:
+                continue
+            values = result['values']
+            values = list(zip(*values))
+            container_df = pd.DataFrame()
+            timestamp = values[0]
+            metric = pd.Series(values[1])
+            container_df['timestamp'] = timestamp
+            container_df['timestamp'] = container_df['timestamp'].astype('datetime64[s]')
+            container_df[pod_name] = metric
+            container_df = container_df.fillna(0)
+            container_df[pod_name] = container_df[pod_name].astype('float64')
+            if pod_df.empty:
+                pod_df = container_df
+            elif pod_name in pod_df.columns:
+                pod_df = pod_df.set_index('timestamp').combine_first(container_df.set_index('timestamp')).reset_index()
+                for i in range(len(container_df[pod_name])):
+                    pod_df_index = pod_df.loc[pod_df['timestamp'] == container_df['timestamp'][i]].index[0]
+                    pod_df.at[pod_df_index, pod_name] = 1 if pod_df[pod_name][pod_df_index] == 0 and container_df[pod_name][i] == 1 else pod_df[pod_name][pod_df_index]
+            else:
+                pod_df = pd.merge(pod_df, container_df, on='timestamp', how='outer')
+            pod_df = pod_df.fillna(0)
     pod_df = pod_df.sort_values(by='timestamp')
     pod_df = pod_df.reset_index(drop=True)
 
