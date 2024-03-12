@@ -25,6 +25,9 @@ class Config:
         self.lookBack = str(int(self.duration / 60)) + 'm'
         self.limit = 100000
 
+        # kiali
+        self.kiali_url = 'http://47.99.200.176:32001/kiali/api'
+
         # kubernetes
         self.k8s_config = 'config.yaml'  # kubernetes配置文件地址
 

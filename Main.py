@@ -3,10 +3,10 @@ import sys
 import pkl_concat
 from Config import Config
 import MetricCollector
-from handler import Trace
+from handler import Trace, Log
 import time
 from util.utils import *
-
+import os
 
 if __name__ == "__main__":
     # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
@@ -14,11 +14,13 @@ if __name__ == "__main__":
     # namespaces = ['horsecoder-test']
     config = Config()
 
+
     class Simple:
         def __init__(self, label, begin, end):
             self.label = label
             self.begin = begin
             self.end = end
+
 
     def read_label_logs(label_file, simple_list: [Simple]):
         if simple_list is None:
@@ -43,6 +45,7 @@ if __name__ == "__main__":
                         simple_list.append(simple)
         except Exception as e:
             print(f"Error reading file {file_path}: {e}")
+
 
     simple_list: [Simple] = []
     read_label_logs('data/topoChange/label.txt', simple_list)
@@ -80,8 +83,9 @@ if __name__ == "__main__":
                     is_header = True
                 else:
                     is_header = False
-                MetricCollector.collect(config, data_folder, is_header)
-                Trace.collect(config, data_folder)
+                MetricCollector.collect(config, os.path.join(data_folder, 'metrics'), is_header)
+                Trace.collect(config, os.path.join(data_folder, 'trace'))
+                Log.collect(config, os.path.join(data_folder, 'log'))
                 now_time += config.duration + config.step
                 config.pods.clear()
                 count += 1
