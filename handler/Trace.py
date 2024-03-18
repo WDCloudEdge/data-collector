@@ -10,6 +10,8 @@ global_svcs = []
 global_namespace_svcs_dict = {}
 
 def collect(config: Config, _dir: str):
+    if not os.path.exists(_dir):
+        os.makedirs(_dir)
     global global_namespace_svcs_dict
     global_namespace_svcs_dict = KubernetesClient(config).get_all_svc()
     # config.svcs = KubernetesClient(config).get_svc_list_name()
