@@ -24,8 +24,9 @@ python Main-Openclaw.py 180
 
 - `raw/openclaw_otel_raw.json` — 完整原始遥测数据（含解析后的 spans / metrics / logs 及原始日志行）
 - `raw/openclaw_ollama_raw.json` — `ollama-proxy` 原始数据（records + invalid_lines + raw_lines）
-- `result/openclaw_trace_groups.json` — 融合后的按 `trace_id` 分组结果（含 spans 列表与 attributes）
-- `result/openclaw_trace_groups_flat.csv` — 融合结果的平铺表，便于快速筛选/统计
+- `tidy/openclaw_otel_tidy.json` — 精简后的 span 级别数据（按秒时间、token、duration 等）
+- `tidy/openclaw_ollama_tidy.json` — 精简后的请求/响应级别数据（按秒时间、token、message 结构）
+- `result/result.json` — 按规则串联后的 webchat span 与对应 ollama record 链路结果
 
 其余参数已内置默认值：
 
