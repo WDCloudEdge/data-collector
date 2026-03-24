@@ -1,0 +1,367 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ollama-proxy-script
+  namespace: openclaw
+data:
+  server.js: |
+    const http = require("http");
+    const { URL } = require("url");
+    const fs = require("fs");
+    const path = require("path");
+
+    const LISTEN_PORT = Number(process.env.PROXY_PORT || "11434");
+    const UPSTREAM_BASE = process.env.OLLAMA_UPSTREAM || "http://192.168.31.96:11434";
+    const LOG_DIR = process.env.PROXY_LOG_DIR || "/var/log/ollama-proxy";
+    const MAX_LOG_BODY_BYTES = Number(process.env.MAX_LOG_BODY_BYTES || "2097152");
+
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+    const rawLogPath = path.join(LOG_DIR, "openclaw_proxy_raw.jsonl");
+    const parsedLogPath = path.join(LOG_DIR, "openclaw_proxy_parsed.jsonl");
+    let globalIndex = 0;
+    const internalCallCounter = new Map();
+
+    function safeJsonParse(text) {
+      if (!text || typeof text !== "string") return null;
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    }
+
+    function truncateUtf8(buffer, limit) {
+      if (!buffer || buffer.length <= limit) return buffer;
+      return buffer.subarray(0, limit);
+    }
+
+    function appendJsonl(filePath, obj) {
+      fs.appendFile(filePath, JSON.stringify(obj) + "\n", (err) => {
+        if (err) {
+          console.error("append log failed:", err.message);
+        }
+      });
+    }
+
+    function parseTraceparent(value) {
+      if (!value || typeof value !== "string") {
+        return { traceId: null, parentSpanId: null };
+      }
+      const parts = value.trim().split("-");
+      if (parts.length !== 4) {
+        return { traceId: null, parentSpanId: null };
+      }
+      return {
+        traceId: parts[1] || null,
+        parentSpanId: parts[2] || null,
+      };
+    }
+
+    function ensureTraceContext(traceHeader) {
+      const incoming = Array.isArray(traceHeader) ? traceHeader[0] : traceHeader;
+      const parsed = parseTraceparent(incoming);
+      return {
+        incomingTraceparent: incoming || null,
+        traceId: parsed.traceId || null,
+        parentSpanId: parsed.parentSpanId || null,
+      };
+    }
+
+    function parseOllamaStreamResponse(rawText) {
+      if (!rawText || typeof rawText !== "string") {
+        return { lastChunk: null, mergedContent: null };
+      }
+      const lines = rawText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+      const chunks = [];
+      for (const line of lines) {
+        const obj = safeJsonParse(line);
+        if (obj && typeof obj === "object") {
+          chunks.push(obj);
+        }
+      }
+      if (!chunks.length) {
+        return { lastChunk: null, mergedContent: null };
+      }
+      const mergedContent = chunks
+        .map((c) => c?.message?.content)
+        .filter((v) => typeof v === "string" && v.length > 0)
+        .join("");
+      const doneChunk =
+        chunks.find((c) => c && c.done === true) || chunks[chunks.length - 1];
+      return {
+        lastChunk: doneChunk || null,
+        mergedContent: mergedContent || null,
+      };
+    }
+
+    function pickFirstPrompt(payload) {
+      if (!payload || typeof payload !== "object") {
+        return { role: null, content: null };
+      }
+      if (Array.isArray(payload.messages) && payload.messages.length > 0) {
+        return {
+          role: payload.messages[0]?.role ?? null,
+          content: payload.messages[0]?.content ?? null,
+        };
+      }
+      if (typeof payload.prompt === "string") {
+        return { role: "user", content: payload.prompt };
+      }
+      return { role: null, content: null };
+    }
+
+    function pickCompletion(responseJson) {
+      if (!responseJson || typeof responseJson !== "object") {
+        return { content: null, finishReason: null };
+      }
+      const content =
+        responseJson?.message?.content ??
+        responseJson?.response ??
+        null;
+      const finishReason =
+        responseJson?.done_reason ??
+        responseJson?.finish_reason ??
+        null;
+      return { content, finishReason };
+    }
+
+    function buildParsedRecord({
+      requestJson,
+      responseJson,
+      requestHeaders,
+      traceId,
+      parentSpanId,
+      timestamp,
+    }) {
+      const { role, content } = pickFirstPrompt(requestJson);
+      const completion = pickCompletion(responseJson);
+      const callKey = traceId || "no-trace";
+      const nextIndex = (internalCallCounter.get(callKey) || 0) + 1;
+      internalCallCounter.set(callKey, nextIndex);
+
+      return {
+        index: ++globalIndex,
+        timestamp,
+        trace_id: traceId,
+        span_id: null,
+        parent_span_id: parentSpanId,
+        service_name: process.env.SERVICE_NAME || "openclaw-ollama-proxy",
+        k8s_pod_name: process.env.HOSTNAME || null,
+        gen_ai: {
+          request: {
+            model: requestJson?.model ?? null,
+            temperature:
+              requestJson?.options?.temperature ??
+              requestJson?.temperature ??
+              null,
+            prompt_0: {
+              role,
+              content,
+            },
+          },
+          response: {
+            model: responseJson?.model ?? requestJson?.model ?? null,
+            completion_0: {
+              content: completion.content,
+              finish_reason: completion.finishReason,
+            },
+            usage: {
+              prompt_tokens:
+                responseJson?.prompt_eval_count ??
+                responseJson?.usage?.prompt_tokens ??
+                null,
+              completion_tokens:
+                responseJson?.eval_count ??
+                responseJson?.usage?.completion_tokens ??
+                null,
+            },
+          },
+        },
+        openclaw: {
+          internal_call_index: nextIndex,
+        },
+        http: {
+          method: requestHeaders.method,
+          path: requestHeaders.path,
+        },
+      };
+    }
+
+    const server = http.createServer((req, res) => {
+      const timestamp = new Date().toISOString();
+      const chunks = [];
+      let bodyBytes = 0;
+
+      req.on("data", (chunk) => {
+        bodyBytes += chunk.length;
+        chunks.push(chunk);
+      });
+
+      req.on("end", () => {
+        const reqBody = Buffer.concat(chunks);
+        const reqBodyForLog = truncateUtf8(reqBody, MAX_LOG_BODY_BYTES);
+        const reqBodyText = reqBodyForLog.toString("utf8");
+        const reqJson = safeJsonParse(reqBodyText);
+
+        const traceHeader = req.headers["traceparent"];
+        const traceCtx = ensureTraceContext(traceHeader);
+
+        const upstreamUrl = new URL(req.url, UPSTREAM_BASE);
+        const upstreamHeaders = { ...req.headers };
+        delete upstreamHeaders.host;
+        delete upstreamHeaders["content-length"];
+
+        const upstreamReq = http.request(
+          {
+            protocol: upstreamUrl.protocol,
+            hostname: upstreamUrl.hostname,
+            port: upstreamUrl.port,
+            method: req.method,
+            path: upstreamUrl.pathname + upstreamUrl.search,
+            headers: upstreamHeaders,
+          },
+          (upstreamRes) => {
+            res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
+
+            const respChunks = [];
+            let respBytes = 0;
+            upstreamRes.on("data", (chunk) => {
+              respBytes += chunk.length;
+              if (respBytes <= MAX_LOG_BODY_BYTES) {
+                respChunks.push(chunk);
+              }
+              res.write(chunk);
+            });
+
+            upstreamRes.on("end", () => {
+              res.end();
+              const respBody = Buffer.concat(respChunks);
+              const respBodyText = respBody.toString("utf8");
+              const streamParsed = parseOllamaStreamResponse(respBodyText);
+              const respJson = safeJsonParse(respBodyText) || streamParsed.lastChunk;
+
+              appendJsonl(rawLogPath, {
+                timestamp,
+                method: req.method,
+                path: req.url,
+                traceparent: traceCtx.incomingTraceparent,
+                incoming_traceparent: traceCtx.incomingTraceparent,
+                trace_id: traceCtx.traceId,
+                span_id: null,
+                parent_span_id: traceCtx.parentSpanId,
+                request_headers: req.headers,
+                request_body: reqJson || reqBodyText,
+                response_status: upstreamRes.statusCode || null,
+                response_headers: upstreamRes.headers,
+                response_body: respJson || respBodyText,
+                response_body_raw: respBodyText,
+                response_completion_merged: streamParsed.mergedContent,
+              });
+
+              appendJsonl(
+                parsedLogPath,
+                buildParsedRecord({
+                  requestJson: reqJson,
+                  responseJson: respJson,
+                  requestHeaders: {
+                    method: req.method,
+                    path: req.url,
+                  },
+                  traceId: traceCtx.traceId,
+                  parentSpanId: traceCtx.parentSpanId,
+                  timestamp,
+                })
+              );
+            });
+          }
+        );
+
+        upstreamReq.on("error", (err) => {
+          const failBody = JSON.stringify({
+            error: "proxy_upstream_error",
+            message: err.message,
+          });
+          res.writeHead(502, { "content-type": "application/json" });
+          res.end(failBody);
+
+          appendJsonl(rawLogPath, {
+            timestamp,
+            method: req.method,
+            path: req.url,
+            request_headers: req.headers,
+            request_body: reqJson || reqBodyText,
+            response_status: 502,
+            error: err.message,
+          });
+        });
+
+        upstreamReq.write(reqBody);
+        upstreamReq.end();
+      });
+    });
+
+    server.listen(LISTEN_PORT, "0.0.0.0", () => {
+      console.log(
+        `[ollama-proxy] listening on :${LISTEN_PORT}, upstream=${UPSTREAM_BASE}, log_dir=${LOG_DIR}`
+      );
+    });
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama-proxy
+  namespace: openclaw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama-proxy
+  template:
+    metadata:
+      labels:
+        app: ollama-proxy
+    spec:
+      containers:
+        - name: proxy
+          image: node:20-alpine
+          command: ["node", "/app/server.js"]
+          env:
+            - name: PROXY_PORT
+              value: "11434"
+            - name: OLLAMA_UPSTREAM
+              value: "http://192.168.31.96:11434"
+            - name: SERVICE_NAME
+              value: "openclaw-ollama-proxy"
+            - name: PROXY_LOG_DIR
+              value: "/var/log/ollama-proxy"
+            - name: MAX_LOG_BODY_BYTES
+              value: "2097152"
+          ports:
+            - containerPort: 11434
+          volumeMounts:
+            - name: proxy-script
+              mountPath: /app
+            - name: proxy-log
+              mountPath: /var/log/ollama-proxy
+      volumes:
+        - name: proxy-script
+          configMap:
+            name: ollama-proxy-script
+        - name: proxy-log
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama-proxy
+  namespace: openclaw
+spec:
+  selector:
+    app: ollama-proxy
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434
