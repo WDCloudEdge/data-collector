@@ -302,7 +302,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         cpu_df = cpu_df.fillna(0)
     cpu_df = cpu_df.sort_values(by='timestamp')
     cpu_df = cpu_df.reset_index(drop=True)
-    cpu_df = cpu_df.mask((cpu_df == 0) & (pod_df == 0), -1)
+    # cpu_df = cpu_df.mask((cpu_df == 0) & (pod_df == 0), -1)
     cpu_df.rename(columns=cpu_rename, inplace=True)
 
     mem_rename = {}
@@ -335,7 +335,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         mem_df = mem_df.fillna(0)
     mem_df = mem_df.sort_values(by='timestamp')
     mem_df = mem_df.reset_index(drop=True)
-    mem_df = mem_df.mask((mem_df == 0) & (pod_df == 0), -1)
+    # mem_df = mem_df.mask((mem_df == 0) & (pod_df == 0), -1)
     mem_df.rename(columns=mem_rename, inplace=True)
 
     net_rename = {}
@@ -365,7 +365,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         net_df = net_df.fillna(0)
     net_df = net_df.sort_values(by='timestamp')
     net_df = net_df.reset_index(drop=True)
-    net_df = net_df.mask((net_df == 0) & (pod_df == 0), -1)
+    # net_df = net_df.mask((net_df == 0) & (pod_df == 0), -1)
     net_df.rename(columns=net_rename, inplace=True)
 
     df = pd.merge(cpu_df, mem_df, on='timestamp', how='outer')
@@ -404,12 +404,13 @@ def collect_succeess_rate(config: Config, _dir: str, is_header: bool):
 def collect_node_metric(config: Config, _dir: str, is_header: bool):
     df = pd.DataFrame()
     prom_util = PrometheusClient(config)
-    for node in KubernetesClient(config).get_nodes():
+    nodes = KubernetesClient(config).get_nodes()
+    for node in nodes:
         prom_sql = 'rate(node_network_transmit_packets_total{device="cni0", instance="%s"}[1m]) / 1000' % node.node_name
         response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
         # 改动
         if response == []:
-            return
+            continue
         values = response[0]['values']
         values = list(zip(*values))
         timestamp = values[0]
@@ -427,18 +428,18 @@ def collect_node_metric(config: Config, _dir: str, is_header: bool):
             df = pd.merge(df, node_df, on='timestamp', how='outer')
         df = df.fillna(0)
 
-        prom_sql = 'rate(node_network_transmit_packets_total{device="raven0", instance="%s"}[3m]) / 1000' % node.node_name
-        response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
-        values = response[0]['values']
-        values = list(zip(*values))
-        node_df = pd.DataFrame()
-        node_df['timestamp'] = timestamp
-        node_df['timestamp'] = node_df['timestamp'].astype('datetime64[s]')
-        metric = pd.Series(values[1])
-        col_name = '(node)' + node.name + '_edge_network'
-        node_df[col_name] = metric
-        node_df[col_name] = node_df[col_name].astype('float64')
-        node_df = node_df.fillna(0)
+        # prom_sql = 'rate(node_network_transmit_packets_total{device="raven0", instance="%s"}[3m]) / 1000' % node.node_name
+        # response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
+        # values = response[0]['values']
+        # values = list(zip(*values))
+        # node_df = pd.DataFrame()
+        # node_df['timestamp'] = timestamp
+        # node_df['timestamp'] = node_df['timestamp'].astype('datetime64[s]')
+        # metric = pd.Series(values[1])
+        # col_name = '(node)' + node.name + '_edge_network'
+        # node_df[col_name] = metric
+        # node_df[col_name] = node_df[col_name].astype('float64')
+        # node_df = node_df.fillna(0)
         if df.empty:
             df = node_df
         else:
