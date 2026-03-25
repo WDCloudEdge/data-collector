@@ -7,7 +7,6 @@
 __pycache__/
 handler/__pycache__/
 util/__pycache__/
-/data/
 
 
 .classpath
@@ -52,9 +51,4 @@ Thumbs.db
 /.mvn/
 /mvnw.cmd
 /mvnw
-Dataplotting/*.pdf
-Dataplotting/*.png
 venv/
-Dataplotting/*.pdf
-Dataplotting/*.png
-data4motivation/
