@@ -42,7 +42,9 @@ class Config:
         # 70
         # self.end = 1774350480
         # 90
-        self.end = 1774351020
+        self.end = 1774435020
+
+        # python -c "import time; print(int(time.mktime(time.strptime('2026-03-24 22:55:00','%Y-%m-%d %H:%M:%S'))))"
         self.start = self.end - self.duration
 
         # prometheus

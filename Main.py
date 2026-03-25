@@ -9,7 +9,7 @@ from util.utils import *
 import os
 
 if __name__ == "__main__":
-    # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test']
+    # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test'， 'openclaw']
     namespaces = ['bookinfo']
     # namespaces = ['horsecoder-test']
     config = Config()
