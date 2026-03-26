@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -84,6 +85,21 @@ def _pick_span_value(span: Dict[str, Any], attrs: Dict[str, Any], key: str):
     if val is not None and val != "":
         return val
     return attrs.get(key)
+
+
+def _pick_header_value(record: Dict[str, Any], header_name: str):
+    if not isinstance(record, dict) or not isinstance(header_name, str) or not header_name:
+        return None
+
+    target = header_name.lower()
+    for headers_key in ("response_headers", "request_headers"):
+        headers = record.get(headers_key)
+        if not isinstance(headers, dict):
+            continue
+        for k, v in headers.items():
+            if isinstance(k, str) and k.lower() == target:
+                return v
+    return None
 
 
 def build_openclaw_otel_tidy(otel_raw_path: str, tidy_dir: str) -> str:
@@ -183,6 +199,10 @@ def build_openclaw_ollama_tidy(ollama_raw_path: str, tidy_dir: str) -> str:
             {
                 "timestamp": _to_iso_seconds(start_dt),
                 "end_time": _to_iso_seconds(end_dt),
+                "request_id": _pick_header_value(record, "x-request-id"),
+                "istio_trace_id": _pick_header_value(record, "x-b3-traceid"),
+                "istio_span_id": _pick_header_value(record, "x-b3-spanid"),
+                "istio_parentspanid": _pick_header_value(record, "x-b3-parentspanid"),
                 "model": response_body.get("model") or request_body.get("model"),
                 "token_input": response_body.get("prompt_eval_count"),
                 "token_output": response_body.get("eval_count"),
@@ -195,142 +215,6 @@ def build_openclaw_ollama_tidy(ollama_raw_path: str, tidy_dir: str) -> str:
 
     out_path = os.path.join(tidy_dir, "openclaw_ollama_tidy.json")
     _write_json(out_path, tidy_records)
-    return out_path
-
-
-def _as_float(value: Any, default: float = 0.0) -> float:
-    try:
-        if value is None:
-            return default
-        return float(value)
-    except Exception:
-        return default
-
-
-def _within_one_second(left_dt, right_dt) -> bool:
-    if left_dt is None or right_dt is None:
-        return False
-    return abs((left_dt - right_dt).total_seconds()) <= 1.0
-
-
-def _tokens_match(span: Dict[str, Any], token_input_sum: float, token_output_sum: float) -> bool:
-    span_input = _as_float(span.get("token_input"), 0.0)
-    span_output = _as_float(span.get("token_output"), 0.0)
-    # Allow tiny differences due to rounding/serialization.
-    return abs(token_input_sum - span_input) <= 1.0 and abs(token_output_sum - span_output) <= 1.0
-
-
-def build_openclaw_result(otel_tidy_path: str, ollama_tidy_path: str, result_dir: str) -> str:
-    with open(otel_tidy_path, "r", encoding="utf-8") as fr:
-        otel_spans = json.load(fr)
-    with open(ollama_tidy_path, "r", encoding="utf-8") as fr:
-        ollama_records = json.load(fr)
-
-    if not isinstance(otel_spans, list):
-        otel_spans = []
-    if not isinstance(ollama_records, list):
-        ollama_records = []
-
-    used_record_indices = set()
-    merged = []
-
-    for span in otel_spans:
-        if not isinstance(span, dict):
-            continue
-        if str(span.get("channel", "")) != "webchat":
-            continue
-
-        span_model = span.get("model")
-        span_start_dt = _parse_iso_datetime(span.get("timestamp"))
-        span_end_dt = _parse_iso_datetime(span.get("end_time"))
-
-        matched_records: List[Dict[str, Any]] = []
-        matched_indices: List[int] = []
-
-        # Find a chain:
-        # 1) first record timestamp aligns with span timestamp (<=1s)
-        # 2) subsequent records self-align: prev.end_time -> next.timestamp (<=1s)
-        # 3) chain final end_time aligns with span end_time (<=1s)
-        # 4) summed token_input/output align with span token_input/output
-        for i, candidate in enumerate(ollama_records):
-            if i in used_record_indices:
-                continue
-            if not isinstance(candidate, dict):
-                continue
-            if candidate.get("model") != span_model:
-                continue
-
-            first_start_dt = _parse_iso_datetime(candidate.get("timestamp"))
-            if not _within_one_second(span_start_dt, first_start_dt):
-                continue
-
-            chain: List[Dict[str, Any]] = []
-            chain_indices: List[int] = []
-            token_input_sum = 0.0
-            token_output_sum = 0.0
-            prev_end_dt = None
-
-            for j in range(i, len(ollama_records)):
-                if j in used_record_indices:
-                    break
-                rec = ollama_records[j]
-                if not isinstance(rec, dict):
-                    continue
-                if rec.get("model") != span_model:
-                    break
-
-                rec_start_dt = _parse_iso_datetime(rec.get("timestamp"))
-                rec_end_dt = _parse_iso_datetime(rec.get("end_time"))
-
-                if len(chain) == 0:
-                    if not _within_one_second(span_start_dt, rec_start_dt):
-                        break
-                else:
-                    if not _within_one_second(prev_end_dt, rec_start_dt):
-                        break
-
-                chain.append(rec)
-                chain_indices.append(j)
-                token_input_sum += _as_float(rec.get("token_input"), 0.0)
-                token_output_sum += _as_float(rec.get("token_output"), 0.0)
-
-                prev_end_dt = rec_end_dt if rec_end_dt is not None else rec_start_dt
-
-                if (
-                    _within_one_second(prev_end_dt, span_end_dt)
-                    and _tokens_match(span, token_input_sum, token_output_sum)
-                ):
-                    matched_records = chain
-                    matched_indices = chain_indices
-                    break
-
-            if matched_records:
-                break
-
-        for idx in matched_indices:
-            used_record_indices.add(idx)
-
-        merged.append(
-            {
-                "timestamp": span.get("timestamp"),
-                "end_time": span.get("end_time"),
-                "trace_id": span.get("trace_id"),
-                "span_id": span.get("span_id"),
-                "parent_id": span.get("parent_id"),
-                "sessionKey": span.get("sessionKey"),
-                "sessionId": span.get("sessionId"),
-                "channel": span.get("channel"),
-                "provider": span.get("provider"),
-                "model": span.get("model"),
-                "token_input": span.get("token_input"),
-                "token_output": span.get("token_output"),
-                "duration": span.get("duration"),
-                "records": matched_records,
-            }
-        )
-
-    out_path = os.path.join(result_dir, "result.json")
-    _write_json(out_path, merged)
     return out_path
 
 
@@ -621,11 +505,10 @@ def main():
     tidy_dir = os.path.join(out_dir, "tidy")
     otel_tidy_path = build_openclaw_otel_tidy(otel_raw_path, tidy_dir)
     ollama_tidy_path = build_openclaw_ollama_tidy(proxy_result["path"], tidy_dir)
-    result_path = build_openclaw_result(
-        otel_tidy_path=otel_tidy_path,
-        ollama_tidy_path=ollama_tidy_path,
-        result_dir=os.path.join(out_dir, "result"),
-    )
+    result_dir = os.path.join(out_dir, "result")
+    os.makedirs(result_dir, exist_ok=True)
+    result_path = os.path.join(result_dir, "result.json")
+    shutil.copyfile(ollama_tidy_path, result_path)
 
     print(f"\nOpenClaw export completed: {out_dir}")
     print(f"  Raw JSON: {otel_raw_path}")

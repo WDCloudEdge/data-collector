@@ -1,0 +1,12 @@
+﻿end_time,gen_ai.request.model,gen_ai.response.model,gen_ai.usage.completion_tokens,gen_ai.usage.prompt_tokens,join.confidence,name,openclaw.internal_call_index,parent_span_id,sequence_id,span_id,start_time,trace_id
+2026-03-23T09:42:00Z,,,0,0,0.0,openclaw.session.stuck,1,,1,c55cd5fd641b9ad6,2026-03-23T09:42:00Z,e462ec8ad221e6a44db440f795cc4214
+2026-03-23T09:42:30Z,,,0,0,0.0,openclaw.session.stuck,1,,1,ee3c626c73c69810,2026-03-23T09:42:30Z,652749f1a01ee96d176d5ba42c513536
+2026-03-23T09:43:00Z,,,0,0,0.0,openclaw.session.stuck,1,,1,f40b919ef94b2a42,2026-03-23T09:43:00Z,71af08f979d365e2f3adbdf7eef5b8c9
+2026-03-23T09:43:30Z,,,0,0,0.0,openclaw.session.stuck,1,,1,ed72a7e0ec4377df,2026-03-23T09:43:30Z,15d8dc29a17ea6b1598831daed390c2b
+2026-03-23T09:43:30Z,,,0,0,0.0,openclaw.session.stuck,1,,1,f2d1948c0d3baa25,2026-03-23T09:43:30Z,3973ed8dbd15511283cd940f76989a90
+2026-03-23T09:44:00Z,,,0,0,0.0,openclaw.session.stuck,1,,1,77ff4705625308c6,2026-03-23T09:44:00Z,c66701a7f9d8f8bbde7161c37257a4ab
+2026-03-23T09:44:00Z,,,0,0,0.0,openclaw.session.stuck,1,,1,25bd9713b39a91c8,2026-03-23T09:44:00Z,166aeb0005be174018aa04169da4a501
+2026-03-23T09:44:30Z,,,0,0,0.0,openclaw.session.stuck,1,,1,4d335390c0050e21,2026-03-23T09:44:30Z,cffd1c85a165bb5dc645e151ed966115
+2026-03-23T09:44:30Z,,,0,0,0.0,openclaw.session.stuck,1,,1,942ac57f75473c19,2026-03-23T09:44:30Z,44f0a94b68a0fab2d76afff614cfed56
+2026-03-23T09:45:00Z,,,0,0,0.0,openclaw.session.stuck,1,,1,ac529edf1af2dd44,2026-03-23T09:45:00Z,3461af0552a1d4f85a7cd679b5084d7b
+2026-03-23T09:45:30Z,,,0,0,0.0,openclaw.session.stuck,1,,1,779f15318c01ee9d,2026-03-23T09:45:30Z,37bdc598726bef93b74d9e4387dcd8cb

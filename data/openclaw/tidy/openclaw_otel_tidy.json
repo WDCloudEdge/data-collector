@@ -1,0 +1,32 @@
+[
+  {
+    "timestamp": "2026-03-26T16:00:42Z",
+    "end_time": "2026-03-26T16:02:47Z",
+    "trace_id": "1c65fa0824b5a4b8ef7d93af915db2b5",
+    "span_id": "7c97c56464ae93b0",
+    "parent_id": "",
+    "sessionKey": "agent:main:main",
+    "sessionId": null,
+    "channel": "heartbeat",
+    "provider": "ollama",
+    "model": "qwen3:8b",
+    "token_input": 0.0,
+    "token_output": 0.0,
+    "duration": 125
+  },
+  {
+    "timestamp": "2026-03-26T16:00:42Z",
+    "end_time": "2026-03-26T16:02:47Z",
+    "trace_id": "94ca931abcd06f840eeaac4dc00b50e4",
+    "span_id": "e3bd11d028b9b5a9",
+    "parent_id": "",
+    "sessionKey": "agent:main:main",
+    "sessionId": "fe9d49f8-54ec-4c6d-9a8c-a69d03f8dabd",
+    "channel": "webchat",
+    "provider": "ollama",
+    "model": "qwen3:8b",
+    "token_input": 26396.0,
+    "token_output": 1095.0,
+    "duration": 125
+  }
+]
