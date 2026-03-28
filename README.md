@@ -23,13 +23,15 @@ python Main-Openclaw.py 180
 输出文件：
 
 - `raw/openclaw_otel_raw.json` — 完整原始遥测数据（含解析后的 spans / metrics / logs 及原始日志行）
-- `raw/openclaw_ollama_raw.json` — `ollama-proxy` 原始数据（records + invalid_lines + raw_lines）
+- `raw/openclaw_ollama_raw.json` 或 `raw/openclaw_dashscope_proxy.json` — 代理原始数据（records + invalid_lines + raw_lines）
 - `tidy/openclaw_otel_tidy.json` — 精简后的 span 级别数据（按秒时间、token、duration 等）
-- `tidy/openclaw_ollama_tidy.json` — 精简后的请求/响应级别数据（按秒时间、token、message 结构）
-- `result/result.json` — 按规则串联后的 webchat span 与对应 ollama record 链路结果
+- `tidy/openclaw_ollama_tidy.json` 或 `tidy/openclaw_dashscope_tidy.json` — 精简后的请求/响应级别数据（按秒时间、token、message 结构）
 
 其余参数已内置默认值：
 
 - otel-collector: `openclaw/otel-collector-verify`
-- ollama-proxy: `openclaw/ollama-proxy`
-- proxy 日志路径: `/var/log/ollama-proxy/openclaw_proxy_raw.jsonl`
+- 方式1(ollama) proxy: `openclaw/ollama-proxy`，日志路径：`/var/log/ollama-proxy/openclaw_proxy_raw.jsonl`
+- 方式2(apikey) proxy 默认: `openclaw/dashscope-proxy`，日志路径：`/var/log/dashscope-proxy/openclaw_proxy_raw.jsonl`
+- 可通过环境变量覆盖：
+  - `OPENCLAW_OLLAMA_PROXY_DEPLOYMENT` / `OPENCLAW_OLLAMA_PROXY_LOG_PATH`
+  - `OPENCLAW_APIKEY_PROXY_DEPLOYMENT` / `OPENCLAW_APIKEY_PROXY_LOG_PATH`

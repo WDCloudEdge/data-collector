@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import threading
 import time
@@ -18,9 +17,17 @@ DEFAULT_SINCE = "0"
 DEFAULT_USER = "openclaw"
 DEFAULT_OUTPUT_ROOT = "./data"
 DEFAULT_PROXY_NAMESPACE = "openclaw"
-DEFAULT_PROXY_DEPLOYMENT = "ollama-proxy"
+DEFAULT_OLLAMA_PROXY_DEPLOYMENT = os.getenv("OPENCLAW_OLLAMA_PROXY_DEPLOYMENT", "ollama-proxy")
+DEFAULT_APIKEY_PROXY_DEPLOYMENT = os.getenv("OPENCLAW_APIKEY_PROXY_DEPLOYMENT", "dashscope-proxy")
 DEFAULT_PROXY_CONTAINER = ""
-DEFAULT_PROXY_LOG_PATH = "/var/log/ollama-proxy/openclaw_proxy_raw.jsonl"
+DEFAULT_OLLAMA_PROXY_LOG_PATH = os.getenv(
+    "OPENCLAW_OLLAMA_PROXY_LOG_PATH",
+    "/var/log/ollama-proxy/openclaw_proxy_raw.jsonl",
+)
+DEFAULT_APIKEY_PROXY_LOG_PATH = os.getenv(
+    "OPENCLAW_APIKEY_PROXY_LOG_PATH",
+    "/var/log/dashscope-proxy/openclaw_proxy_raw.jsonl",
+)
 
 
 def _parse_iso_datetime(value: Any):
@@ -156,7 +163,7 @@ def _compact_message(msg: Any) -> Dict[str, Any]:
     }
 
 
-def build_openclaw_ollama_tidy(ollama_raw_path: str, tidy_dir: str) -> str:
+def build_openclaw_ollama_tidy(ollama_raw_path: str, tidy_dir: str, output_filename: str = "openclaw_ollama_tidy.json") -> str:
     with open(ollama_raw_path, "r", encoding="utf-8") as fr:
         raw_obj = json.load(fr)
 
@@ -213,7 +220,7 @@ def build_openclaw_ollama_tidy(ollama_raw_path: str, tidy_dir: str) -> str:
             }
         )
 
-    out_path = os.path.join(tidy_dir, "openclaw_ollama_tidy.json")
+    out_path = os.path.join(tidy_dir, output_filename)
     _write_json(out_path, tidy_records)
     return out_path
 
@@ -423,7 +430,7 @@ class OllamaProxyRawCollector:
             "invalid_lines": invalid_lines,
         }
 
-    def export_raw_json(self, raw_text: str, out_dir: str) -> Dict:
+    def export_raw_json(self, raw_text: str, out_dir: str, output_filename: str = "openclaw_ollama_raw.json") -> Dict:
         payload = self._parse_jsonl(raw_text)
         output = {
             "meta": {
@@ -443,7 +450,7 @@ class OllamaProxyRawCollector:
         }
         raw_dir = os.path.join(out_dir, "raw")
         os.makedirs(raw_dir, exist_ok=True)
-        out_path = os.path.join(raw_dir, "openclaw_ollama_raw.json")
+        out_path = os.path.join(raw_dir, output_filename)
         with open(out_path, "w", encoding="utf-8") as fw:
             json.dump(output, fw, ensure_ascii=False, indent=2)
         return {
@@ -452,6 +459,14 @@ class OllamaProxyRawCollector:
             "records": output["counts"]["records"],
             "invalid_lines": output["counts"]["invalid_lines"],
         }
+
+
+def _k8s_deployment_exists(namespace: str, deployment: str) -> bool:
+    if not deployment:
+        return False
+    cmd = ["kubectl", "-n", namespace, "get", "deployment", deployment]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    return proc.returncode == 0
 
 
 def parse_args():
@@ -468,6 +483,40 @@ def parse_args():
 
 def main():
     args = parse_args()
+    monitor_mode = ""
+    while monitor_mode not in ("1", "2"):
+        monitor_mode = input("使用ollama监测键入1,使用apikey键入2：").strip()
+        if monitor_mode not in ("1", "2"):
+            print("输入无效，请输入 1 或 2。")
+
+    if monitor_mode == "1":
+        proxy_raw_filename = "openclaw_ollama_raw.json"
+        proxy_tidy_filename = "openclaw_ollama_tidy.json"
+        mode_name = "ollama"
+        proxy_deployment = DEFAULT_OLLAMA_PROXY_DEPLOYMENT
+        proxy_log_path = DEFAULT_OLLAMA_PROXY_LOG_PATH
+    else:
+        proxy_raw_filename = "openclaw_dashscope_proxy.json"
+        proxy_tidy_filename = "openclaw_dashscope_tidy.json"
+        mode_name = "apikey"
+        proxy_deployment = DEFAULT_APIKEY_PROXY_DEPLOYMENT
+        proxy_log_path = DEFAULT_APIKEY_PROXY_LOG_PATH
+        if not _k8s_deployment_exists(DEFAULT_PROXY_NAMESPACE, proxy_deployment):
+            if _k8s_deployment_exists(DEFAULT_PROXY_NAMESPACE, DEFAULT_OLLAMA_PROXY_DEPLOYMENT):
+                print(
+                    "[warn] 未找到 apikey 代理 deployment，已回退为 ollama-proxy。"
+                    f" 可通过环境变量 OPENCLAW_APIKEY_PROXY_DEPLOYMENT 指定（当前: {proxy_deployment}）。"
+                )
+                proxy_deployment = DEFAULT_OLLAMA_PROXY_DEPLOYMENT
+                proxy_log_path = DEFAULT_OLLAMA_PROXY_LOG_PATH
+            else:
+                raise RuntimeError(
+                    "方式2(apikey)代理 deployment 不存在。"
+                    f" 当前配置: {DEFAULT_PROXY_NAMESPACE}/{proxy_deployment}。"
+                    " 请确认 deployment 名称，或设置环境变量 OPENCLAW_APIKEY_PROXY_DEPLOYMENT / "
+                    "OPENCLAW_APIKEY_PROXY_LOG_PATH 后重试。"
+                )
+
     out_dir = os.path.join(DEFAULT_OUTPUT_ROOT, str(DEFAULT_USER))
     collector = OpenClawOtelCollector(
         namespace=DEFAULT_COLLECTOR_NAMESPACE,
@@ -477,9 +526,9 @@ def main():
     )
     proxy_collector = OllamaProxyRawCollector(
         namespace=DEFAULT_PROXY_NAMESPACE,
-        deployment=DEFAULT_PROXY_DEPLOYMENT,
+        deployment=proxy_deployment,
         container=DEFAULT_PROXY_CONTAINER,
-        log_path=DEFAULT_PROXY_LOG_PATH,
+        log_path=proxy_log_path,
     )
 
     print(
@@ -487,10 +536,11 @@ def main():
         f"deploy/{DEFAULT_COLLECTOR_DEPLOYMENT} in ns/{DEFAULT_COLLECTOR_NAMESPACE}, "
         f"since={DEFAULT_SINCE}, watch_seconds={args.watch_seconds}"
     )
+    print(f"Monitoring mode: {mode_name}")
     print(
-        "Collecting Ollama proxy raw logs from "
-        f"deploy/{DEFAULT_PROXY_DEPLOYMENT} in ns/{DEFAULT_PROXY_NAMESPACE}, "
-        f"log_path={DEFAULT_PROXY_LOG_PATH}"
+        "Collecting proxy raw logs from "
+        f"deploy/{proxy_deployment} in ns/{DEFAULT_PROXY_NAMESPACE}, "
+        f"log_path={proxy_log_path}"
     )
     proxy_start_line = proxy_collector.mark_start_line()
     stop_timer = _start_progress_timer(args.watch_seconds)
@@ -498,27 +548,22 @@ def main():
         raw = collector.fetch_logs(watch_seconds=args.watch_seconds)
     finally:
         stop_timer()
-    result = collector.export_all(raw, out_dir)
+    export_stats = collector.export_all(raw, out_dir)
     proxy_raw = proxy_collector.fetch_since_line(proxy_start_line)
-    proxy_result = proxy_collector.export_raw_json(proxy_raw, out_dir)
+    proxy_result = proxy_collector.export_raw_json(proxy_raw, out_dir, output_filename=proxy_raw_filename)
     otel_raw_path = os.path.join(out_dir, "raw", "openclaw_otel_raw.json")
     tidy_dir = os.path.join(out_dir, "tidy")
     otel_tidy_path = build_openclaw_otel_tidy(otel_raw_path, tidy_dir)
-    ollama_tidy_path = build_openclaw_ollama_tidy(proxy_result["path"], tidy_dir)
-    result_dir = os.path.join(out_dir, "result")
-    os.makedirs(result_dir, exist_ok=True)
-    result_path = os.path.join(result_dir, "result.json")
-    shutil.copyfile(ollama_tidy_path, result_path)
+    proxy_tidy_path = build_openclaw_ollama_tidy(proxy_result["path"], tidy_dir, output_filename=proxy_tidy_filename)
 
     print(f"\nOpenClaw export completed: {out_dir}")
     print(f"  Raw JSON: {otel_raw_path}")
     print(f"  Proxy Raw JSON: {proxy_result['path']}")
     print(f"  Tidy OTEL JSON: {otel_tidy_path}")
-    print(f"  Tidy Ollama JSON: {ollama_tidy_path}")
-    print(f"  Result JSON: {result_path}")
+    print(f"  Tidy Proxy JSON: {proxy_tidy_path}")
     print(
-        f"  Spans: {result['spans']}, metric points: {result['metric_points']}, "
-        f"log records: {result['log_records']}"
+        f"  Spans: {export_stats['spans']}, metric points: {export_stats['metric_points']}, "
+        f"log records: {export_stats['log_records']}"
     )
     print(
         f"  Proxy lines: {proxy_result['raw_lines']}, parsed records: {proxy_result['records']}, "
