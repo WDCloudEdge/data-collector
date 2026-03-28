@@ -1,0 +1,419 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashscope-proxy-script
+  namespace: openclaw
+data:
+  server.js: |
+    const http = require("http");
+    const https = require("https");
+    const fs = require("fs");
+    const path = require("path");
+    const { URL } = require("url");
+
+    const LISTEN_PORT = Number(process.env.PROXY_PORT || "11435");
+    // NOTE: UPSTREAM_BASE should be host/root only (no path), because we forward req.url as-is.
+    // Examples:
+    // - https://dashscope.aliyuncs.com
+    const UPSTREAM_BASE = process.env.DASHSCOPE_UPSTREAM || "https://dashscope.aliyuncs.com";
+    const LOG_DIR = process.env.PROXY_LOG_DIR || "/var/log/dashscope-proxy";
+    const MAX_LOG_BODY_BYTES = Number(process.env.MAX_LOG_BODY_BYTES || "2097152");
+    const SERVICE_NAME = process.env.SERVICE_NAME || "openclaw-dashscope-proxy";
+
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+    const rawLogPath = path.join(LOG_DIR, "openclaw_proxy_raw.jsonl");
+    const parsedLogPath = path.join(LOG_DIR, "openclaw_proxy_parsed.jsonl");
+
+    let globalIndex = 0;
+    const internalCallCounter = new Map();
+
+    function safeJsonParse(text) {
+      if (!text || typeof text !== "string") return null;
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    }
+
+    function truncateUtf8(buffer, limit) {
+      if (!buffer || buffer.length <= limit) return buffer;
+      return buffer.subarray(0, limit);
+    }
+
+    function appendJsonl(filePath, obj) {
+      fs.appendFile(filePath, JSON.stringify(obj) + "\n", (err) => {
+        if (err) console.error("append log failed:", err.message);
+      });
+    }
+
+    function parseTraceparent(value) {
+      if (!value || typeof value !== "string") return { traceId: null, parentSpanId: null };
+      const parts = value.trim().split("-");
+      if (parts.length !== 4) return { traceId: null, parentSpanId: null };
+      return { traceId: parts[1] || null, parentSpanId: parts[2] || null };
+    }
+
+    function ensureTraceContext(traceHeader) {
+      const incoming = Array.isArray(traceHeader) ? traceHeader[0] : traceHeader;
+      const parsed = parseTraceparent(incoming);
+      return {
+        incomingTraceparent: incoming || null,
+        traceId: parsed.traceId || null,
+        parentSpanId: parsed.parentSpanId || null,
+      };
+    }
+
+    function redactHeaders(headers) {
+      const redacted = {};
+      for (const [k, v] of Object.entries(headers || {})) {
+        const key = String(k).toLowerCase();
+        if (
+          key === "authorization" ||
+          key === "proxy-authorization" ||
+          key === "x-api-key" ||
+          key === "api-key" ||
+          key === "x-dashscope-api-key" ||
+          key === "x-alibaba-cloud-api-key" ||
+          key === "x-alibabacloud-api-key" ||
+          key === "cookie" ||
+          key === "set-cookie"
+        ) {
+          redacted[k] = "[REDACTED]";
+        } else {
+          redacted[k] = v;
+        }
+      }
+      return redacted;
+    }
+
+    function pickCompletionTextFromOpenAIResponse(respJson) {
+      // Works for both /v1/completions (choices[].text) and /v1/chat/completions (choices[].message.content)
+      try {
+        const choices = respJson?.choices;
+        if (!Array.isArray(choices) || choices.length === 0) return null;
+        return (
+          choices[0]?.message?.content ??
+          choices[0]?.text ??
+          respJson?.output_text ??
+          null
+        );
+      } catch {
+        return null;
+      }
+    }
+
+    function parseOpenAIStreamResponse(rawText) {
+      if (!rawText || typeof rawText !== "string") {
+        return { lastChunk: null, mergedContent: null, mergedToolCalls: null, usage: null, finishReason: null };
+      }
+      const lines = rawText
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0 && l.startsWith("data:"));
+
+      const chunks = [];
+      for (const line of lines) {
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        const obj = safeJsonParse(payload);
+        if (obj && typeof obj === "object") chunks.push(obj);
+      }
+
+      if (!chunks.length) {
+        return { lastChunk: null, mergedContent: null, mergedToolCalls: null, usage: null, finishReason: null };
+      }
+
+      const contentParts = [];
+      const toolCallMap = new Map();
+      let usage = null;
+      let finishReason = null;
+
+      for (const chunk of chunks) {
+        if (chunk && typeof chunk === "object" && chunk.usage && typeof chunk.usage === "object") {
+          usage = chunk.usage;
+        }
+        const choice = Array.isArray(chunk?.choices) ? chunk.choices[0] : null;
+        if (choice && typeof choice === "object") {
+          const delta = choice.delta;
+          if (delta && typeof delta === "object") {
+            const deltaContent = delta.content;
+            if (typeof deltaContent === "string" && deltaContent) {
+              contentParts.push(deltaContent);
+            } else if (Array.isArray(deltaContent)) {
+              for (const part of deltaContent) {
+                if (part && typeof part === "object" && part.type === "text" && typeof part.text === "string") {
+                  contentParts.push(part.text);
+                }
+              }
+            }
+
+            if (Array.isArray(delta.tool_calls)) {
+              for (const tc of delta.tool_calls) {
+                if (!tc || typeof tc !== "object") continue;
+                const idx = Number.isInteger(tc.index) ? tc.index : 0;
+                const existing = toolCallMap.get(idx) || {
+                  index: idx,
+                  id: "",
+                  type: "function",
+                  function: { name: "", arguments: "" },
+                };
+
+                if (typeof tc.id === "string" && tc.id) {
+                  existing.id = tc.id;
+                }
+                if (typeof tc.type === "string" && tc.type) {
+                  existing.type = tc.type;
+                }
+                if (tc.function && typeof tc.function === "object") {
+                  if (typeof tc.function.name === "string" && tc.function.name) {
+                    existing.function.name = (existing.function.name || "") + tc.function.name;
+                  }
+                  if (typeof tc.function.arguments === "string" && tc.function.arguments) {
+                    existing.function.arguments = (existing.function.arguments || "") + tc.function.arguments;
+                  }
+                }
+                toolCallMap.set(idx, existing);
+              }
+            }
+          }
+          if (typeof choice.finish_reason === "string" && choice.finish_reason) {
+            finishReason = choice.finish_reason;
+          }
+        }
+      }
+
+      return {
+        lastChunk: chunks[chunks.length - 1] || null,
+        mergedContent: contentParts.length ? contentParts.join("") : null,
+        mergedToolCalls: toolCallMap.size
+          ? Array.from(toolCallMap.entries())
+              .sort((a, b) => a[0] - b[0])
+              .map(([, v]) => v)
+          : null,
+        usage: usage || null,
+        finishReason: finishReason || null,
+      };
+    }
+
+    function pickPrompt0FromOpenAIRequest(reqJson) {
+      try {
+        if (!reqJson || typeof reqJson !== "object") return { role: null, content: null };
+        if (Array.isArray(reqJson.messages) && reqJson.messages.length > 0) {
+          return {
+            role: reqJson.messages[0]?.role ?? null,
+            content: reqJson.messages[0]?.content ?? null,
+          };
+        }
+        if (typeof reqJson.prompt === "string") {
+          return { role: "user", content: reqJson.prompt };
+        }
+        return { role: null, content: null };
+      } catch {
+        return { role: null, content: null };
+      }
+    }
+
+    const upstreamBaseUrl = new URL(UPSTREAM_BASE);
+    const useHttps = upstreamBaseUrl.protocol === "https:";
+
+    const server = http.createServer((req, res) => {
+      const timestamp = new Date().toISOString();
+      const chunks = [];
+
+      req.on("data", (chunk) => chunks.push(chunk));
+
+      req.on("end", () => {
+        const reqBody = Buffer.concat(chunks);
+        const reqBodyForLog = truncateUtf8(reqBody, MAX_LOG_BODY_BYTES);
+        const reqBodyText = reqBodyForLog.toString("utf8");
+        const reqJson = safeJsonParse(reqBodyText);
+
+        const traceHeader = req.headers["traceparent"];
+        const traceCtx = ensureTraceContext(traceHeader);
+
+        const upstreamHeaders = { ...req.headers };
+        delete upstreamHeaders.host;
+        delete upstreamHeaders["content-length"];
+
+        // Redact before logging to avoid leaking API keys.
+        const requestHeadersForLog = redactHeaders(req.headers);
+
+        const lib = useHttps ? https : http;
+        const upstreamReq = lib.request(
+          {
+            protocol: upstreamBaseUrl.protocol,
+            hostname: upstreamBaseUrl.hostname,
+            port: upstreamBaseUrl.port || undefined,
+            method: req.method,
+            // Forward full path (including /compatible-mode/v1 if present).
+            path: req.url,
+            headers: upstreamHeaders,
+          },
+          (upstreamRes) => {
+            res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
+
+            const respChunks = [];
+            let respBytes = 0;
+            upstreamRes.on("data", (chunk) => {
+              respBytes += chunk.length;
+              if (respBytes <= MAX_LOG_BODY_BYTES) respChunks.push(chunk);
+              res.write(chunk);
+            });
+
+            upstreamRes.on("end", () => {
+              res.end();
+              const responseTimestamp = new Date().toISOString();
+
+              const respBody = Buffer.concat(respChunks);
+              const respBodyText = respBody.toString("utf8");
+              const streamParsed = parseOpenAIStreamResponse(respBodyText);
+              const respJson = safeJsonParse(respBodyText) || streamParsed.lastChunk;
+
+              const completionText =
+                (respJson ? pickCompletionTextFromOpenAIResponse(respJson) : null) || streamParsed.mergedContent;
+              const prompt0 = pickPrompt0FromOpenAIRequest(reqJson);
+              const callKey = traceCtx.traceId || "no-trace";
+              const nextIndex = (internalCallCounter.get(callKey) || 0) + 1;
+              internalCallCounter.set(callKey, nextIndex);
+
+              appendJsonl(rawLogPath, {
+                timestamp,
+                method: req.method,
+                path: req.url,
+                traceparent: traceCtx.incomingTraceparent,
+                incoming_traceparent: traceCtx.incomingTraceparent,
+                trace_id: traceCtx.traceId,
+                span_id: null,
+                parent_span_id: traceCtx.parentSpanId,
+                service_name: SERVICE_NAME,
+                k8s_pod_name: process.env.HOSTNAME || null,
+                request_headers: requestHeadersForLog,
+                request_body: reqJson || reqBodyText,
+                response_timestamp: responseTimestamp,
+                response_status: upstreamRes.statusCode || null,
+                response_headers: upstreamRes.headers,
+                response_body: respJson || respBodyText,
+                response_body_raw: respBodyText,
+                response_completion_text: completionText,
+                response_completion_merged: streamParsed.mergedContent,
+                response_tool_calls_merged: streamParsed.mergedToolCalls,
+              });
+
+              appendJsonl(
+                parsedLogPath,
+                {
+                  index: ++globalIndex,
+                  timestamp,
+                  trace_id: traceCtx.traceId,
+                  span_id: null,
+                  parent_span_id: traceCtx.parentSpanId,
+                  service_name: SERVICE_NAME,
+                  k8s_pod_name: process.env.HOSTNAME || null,
+                  gen_ai: {
+                    request: {
+                      model: reqJson?.model ?? null,
+                      temperature: reqJson?.temperature ?? reqJson?.options?.temperature ?? null,
+                      prompt_0: prompt0,
+                    },
+                    response: {
+                      model: respJson?.model ?? reqJson?.model ?? null,
+                      completion_0: { content: completionText },
+                      usage: respJson?.usage ?? streamParsed.usage ?? null,
+                      finish_reason:
+                        respJson?.choices?.[0]?.finish_reason ?? streamParsed.finishReason ?? null,
+                    },
+                  },
+                  openclaw: {
+                    internal_call_index: nextIndex,
+                  },
+                  http: { method: req.method, path: req.url },
+                }
+              );
+            });
+          }
+        );
+
+        upstreamReq.on("error", (err) => {
+          const failBody = JSON.stringify({ error: "proxy_upstream_error", message: err.message });
+          res.writeHead(502, { "content-type": "application/json" });
+          res.end(failBody);
+
+          appendJsonl(rawLogPath, {
+            timestamp,
+            method: req.method,
+            path: req.url,
+            request_headers: requestHeadersForLog,
+            request_body: reqJson || reqBodyText,
+            response_status: 502,
+            error: err.message,
+          });
+        });
+
+        upstreamReq.write(reqBody);
+        upstreamReq.end();
+      });
+    });
+
+    server.listen(LISTEN_PORT, "0.0.0.0", () => {
+      console.log(
+        `[dashscope-proxy] listening on :${LISTEN_PORT}, upstream=${UPSTREAM_BASE}, log_dir=${LOG_DIR}`
+      );
+    });
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashscope-proxy
+  namespace: openclaw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashscope-proxy
+  template:
+    metadata:
+      labels:
+        app: dashscope-proxy
+    spec:
+      containers:
+        - name: proxy
+          image: node:20-alpine
+          command: ["node", "/app/server.js"]
+          env:
+            - name: PROXY_PORT
+              value: "11435"
+            - name: DASHSCOPE_UPSTREAM
+              value: "https://dashscope.aliyuncs.com"
+            - name: SERVICE_NAME
+              value: "openclaw-dashscope-proxy"
+            - name: PROXY_LOG_DIR
+              value: "/var/log/dashscope-proxy"
+            - name: MAX_LOG_BODY_BYTES
+              value: "2097152"
+          ports:
+            - containerPort: 11435
+          volumeMounts:
+            - name: proxy-script
+              mountPath: /app
+            - name: proxy-log
+              mountPath: /var/log/dashscope-proxy
+      volumes:
+        - name: proxy-script
+          configMap:
+            name: dashscope-proxy-script
+        - name: proxy-log
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashscope-proxy
+  namespace: openclaw
+spec:
+  selector:
+    app: dashscope-proxy
+  ports:
+    - name: http
+      port: 11435
+      targetPort: 11435

@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openclaw-gateway
+  namespace: openclaw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openclaw-gateway
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: openclaw-gateway
+    spec:
+      nodeName: node1
+      initContainers:
+        - name: init-config
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mkdir -p /home/node/.openclaw/identity \
+                /home/node/.openclaw/agents/main/agent \
+                /home/node/.openclaw/agents/main/sessions \
+                /home/node/.openclaw/devices \
+                /home/node/.openclaw/logs \
+                /home/node/.openclaw/cron \
+                /home/node/.openclaw/canvas
+              cp -f /config-secret/openclaw.json /home/node/.openclaw/openclaw.json
+              chown -R 1000:1000 /home/node/.openclaw
+          volumeMounts:
+            - name: config-secret
+              mountPath: /config-secret
+              readOnly: true
+            - name: openclaw-home
+              mountPath: /home/node/.openclaw
+            - name: openclaw-workspace
+              mountPath: /home/node/.openclaw/workspace
+        - name: init-diagnostics-otel-deps
+          image: node:20-alpine
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              mkdir -p /work/tmp /work/target
+              cd /work/tmp
+              npm init -y >/dev/null 2>&1
+              npm install --omit=dev --no-package-lock --silent \
+                @opentelemetry/sdk-node \
+                @opentelemetry/exporter-logs-otlp-proto \
+                @opentelemetry/exporter-metrics-otlp-proto \
+                @opentelemetry/exporter-trace-otlp-proto
+              cp -R /work/tmp/node_modules/* /work/target/
+              chmod -R 0777 /work/target
+          volumeMounts:
+            - name: diagnostics-otel-node-modules
+              mountPath: /work
+      containers:
+        - name: gateway
+          image: openclaw/openclaw:local
+          imagePullPolicy: IfNotPresent
+          args:
+            - node
+            - dist/index.js
+            - gateway
+            - --bind
+            - lan
+            - --port
+            - "18789"
+          ports:
+            - containerPort: 18789
+            - containerPort: 18790
+          env:
+            - name: HOME
+              value: /home/node
+          volumeMounts:
+            - name: openclaw-home
+              mountPath: /home/node/.openclaw
+            - name: openclaw-workspace
+              mountPath: /home/node/.openclaw/workspace
+            - name: diagnostics-otel-node-modules
+              mountPath: /app/extensions/diagnostics-otel/node_modules
+              subPath: target
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 18789
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 18789
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: config-secret
+          secret:
+            secretName: openclaw-config
+        - name: openclaw-home
+          persistentVolumeClaim:
+            claimName: openclaw-home-pvc
+        - name: openclaw-workspace
+          persistentVolumeClaim:
+            claimName: openclaw-workspace-pvc
+        - name: diagnostics-otel-node-modules
+          emptyDir: {}

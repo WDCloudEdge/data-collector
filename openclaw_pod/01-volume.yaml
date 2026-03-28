@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: openclaw-home-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: ""      # 关键：显示为空串，表示不通过 StorageClass
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/openclaw/home   # 这个目录会在节点所在机器上创建/使用
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - node1    # 你决定放置存储空间的节点名称，可修改
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: openclaw-workspace-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: ""
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /data/openclaw/workspace
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - node1    # 你决定放置存储空间的节点名称，可修改
