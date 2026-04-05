@@ -52,8 +52,16 @@ def collect_graph(config: Config, _dir: str, is_header: bool):
                 # graph_df = graph_df.append({'source': source, 'destination': destination, 'timestamp': timestamp},
                 #                             ignore_index=True)
 
-    graph_df['timestamp'] = graph_df['timestamp'].astype('datetime64[s]')
-    graph_df = graph_df.sort_values(by='timestamp', ascending=True)
+    # 若 Prometheus 在该时间窗内无 istio_requests / cadvisor 序列，不会写入任何行，也就没有 timestamp 列
+    if graph_df.empty or 'timestamp' not in graph_df.columns:
+        print(
+            'collect_graph: 本窗口内无图数据（istio_requests_total 与 container_cpu 查询均为空）。'
+            '请检查：namespace、Prometheus 地址、Istio 是否注入、该时段是否有流量、Config.start/end 是否落在有数据的时间范围内。'
+        )
+        graph_df = pd.DataFrame(columns=['source', 'destination', 'timestamp'])
+    else:
+        graph_df['timestamp'] = graph_df['timestamp'].astype('datetime64[s]')
+        graph_df = graph_df.sort_values(by='timestamp', ascending=True)
     path = os.path.join(_dir, 'graph.csv')
     graph_df.to_csv(path, index=False, mode='a', header=is_header)
 

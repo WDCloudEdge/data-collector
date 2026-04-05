@@ -1,11 +1,10 @@
 # data-collector
 统一从Prometheus，jaeger收集数据并整理的工具
 
-## OpenClaw OTEL采集入口
+## OpenClaw 采集入口
 
-新增入口：`Main-Openclaw.py`，用于同时抓取：
+新增入口：`Main-Openclaw.py`，用于抓取：
 
-- `otel-collector` 日志（OTEL）
 - `ollama-proxy` 原始 jsonl 日志
 
 并导出原始 JSON。
@@ -22,14 +21,11 @@ python Main-Openclaw.py 180
 
 输出文件：
 
-- `raw/openclaw_otel_raw.json` — 完整原始遥测数据（含解析后的 spans / metrics / logs 及原始日志行）
 - `raw/openclaw_ollama_raw.json` 或 `raw/openclaw_dashscope_proxy.json` — 代理原始数据（records + invalid_lines + raw_lines）
-- `tidy/openclaw_otel_tidy.json` — 精简后的 span 级别数据（按秒时间、token、duration 等）
 - `tidy/openclaw_ollama_tidy.json` 或 `tidy/openclaw_dashscope_tidy.json` — 精简后的请求/响应级别数据（按秒时间、token、message 结构）
 
 其余参数已内置默认值：
 
-- otel-collector: `openclaw/otel-collector-verify`
 - 方式1(ollama) proxy: `openclaw/ollama-proxy`，日志路径：`/var/log/ollama-proxy/openclaw_proxy_raw.jsonl`
 - 方式2(apikey) proxy 默认: `openclaw/dashscope-proxy`，日志路径：`/var/log/dashscope-proxy/openclaw_proxy_raw.jsonl`
 - 可通过环境变量覆盖：

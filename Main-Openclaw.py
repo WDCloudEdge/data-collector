@@ -8,12 +8,6 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-from OpenClawCollector import OpenClawOtelCollector
-
-DEFAULT_COLLECTOR_NAMESPACE = "openclaw"
-DEFAULT_COLLECTOR_DEPLOYMENT = "otel-collector-verify"
-DEFAULT_COLLECTOR_CONTAINER = ""
-DEFAULT_SINCE = "0"
 DEFAULT_USER = "openclaw"
 DEFAULT_OUTPUT_ROOT = "./data"
 DEFAULT_PROXY_NAMESPACE = "openclaw"
@@ -122,13 +116,6 @@ def _write_json(path: str, data: Any):
         json.dump(data, fw, ensure_ascii=False, indent=2)
 
 
-def _pick_span_value(span: Dict[str, Any], attrs: Dict[str, Any], key: str):
-    val = span.get(key)
-    if val is not None and val != "":
-        return val
-    return attrs.get(key)
-
-
 def _pick_header_value(record: Dict[str, Any], header_name: str):
     if not isinstance(record, dict) or not isinstance(header_name, str) or not header_name:
         return None
@@ -188,44 +175,6 @@ def _extract_token_usage(response_body: Dict[str, Any]) -> Dict[str, Any]:
         "token_input": response_body.get("prompt_eval_count"),
         "token_output": response_body.get("eval_count"),
     }
-
-
-def build_openclaw_otel_tidy(otel_raw_path: str, tidy_dir: str) -> str:
-    with open(otel_raw_path, "r", encoding="utf-8") as fr:
-        raw_obj = json.load(fr)
-
-    spans = raw_obj.get("spans", [])
-    tidy_spans = []
-    for span in spans:
-        if not isinstance(span, dict):
-            continue
-        attrs = span.get("attributes")
-        if not isinstance(attrs, dict):
-            attrs = {}
-
-        start_dt = _parse_iso_datetime(span.get("timestamp")) or _parse_iso_datetime(span.get("start_time"))
-        end_dt = _parse_iso_datetime(span.get("end_time"))
-        tidy_spans.append(
-            {
-                "timestamp": _to_iso_seconds(start_dt),
-                "end_time": _to_iso_seconds(end_dt),
-                "trace_id": span.get("trace_id", ""),
-                "span_id": span.get("span_id", ""),
-                "parent_id": span.get("parent_id", ""),
-                "sessionKey": _pick_span_value(span, attrs, "openclaw.sessionKey"),
-                "sessionId": _pick_span_value(span, attrs, "openclaw.sessionId"),
-                "channel": _pick_span_value(span, attrs, "openclaw.channel"),
-                "provider": _pick_span_value(span, attrs, "openclaw.provider"),
-                "model": _pick_span_value(span, attrs, "openclaw.model"),
-                "token_input": _pick_span_value(span, attrs, "openclaw.tokens.input"),
-                "token_output": _pick_span_value(span, attrs, "openclaw.tokens.output"),
-                "duration": _duration_seconds(start_dt, end_dt),
-            }
-        )
-
-    out_path = os.path.join(tidy_dir, "openclaw_otel_tidy.json")
-    _write_json(out_path, tidy_spans)
-    return out_path
 
 
 def _compact_message(msg: Any) -> Dict[str, Any]:
@@ -616,12 +565,6 @@ def main():
                 )
 
     out_dir = os.path.join(DEFAULT_OUTPUT_ROOT, str(DEFAULT_USER))
-    collector = OpenClawOtelCollector(
-        namespace=DEFAULT_COLLECTOR_NAMESPACE,
-        deployment=DEFAULT_COLLECTOR_DEPLOYMENT,
-        since=DEFAULT_SINCE,
-        container=DEFAULT_COLLECTOR_CONTAINER if DEFAULT_COLLECTOR_CONTAINER else None,
-    )
     proxy_collector = OllamaProxyRawCollector(
         namespace=DEFAULT_PROXY_NAMESPACE,
         deployment=proxy_deployment,
@@ -629,11 +572,6 @@ def main():
         log_path=proxy_log_path,
     )
 
-    print(
-        "Collecting OpenClaw telemetry from "
-        f"deploy/{DEFAULT_COLLECTOR_DEPLOYMENT} in ns/{DEFAULT_COLLECTOR_NAMESPACE}, "
-        f"since={DEFAULT_SINCE}, watch_seconds={args.watch_seconds}"
-    )
     print(f"Monitoring mode: {mode_name}")
     print(
         "Collecting proxy raw logs from "
@@ -643,26 +581,17 @@ def main():
     proxy_start_line = proxy_collector.mark_start_line()
     stop_timer = _start_progress_timer(args.watch_seconds)
     try:
-        raw = collector.fetch_logs(watch_seconds=args.watch_seconds)
+        time.sleep(max(0, int(args.watch_seconds)))
     finally:
         stop_timer()
-    export_stats = collector.export_all(raw, out_dir)
     proxy_raw = proxy_collector.fetch_since_line(proxy_start_line)
     proxy_result = proxy_collector.export_raw_json(proxy_raw, out_dir, output_filename=proxy_raw_filename)
-    otel_raw_path = os.path.join(out_dir, "raw", "openclaw_otel_raw.json")
     tidy_dir = os.path.join(out_dir, "tidy")
-    otel_tidy_path = build_openclaw_otel_tidy(otel_raw_path, tidy_dir)
     proxy_tidy_path = build_openclaw_ollama_tidy(proxy_result["path"], tidy_dir, output_filename=proxy_tidy_filename)
 
     print(f"\nOpenClaw export completed: {out_dir}")
-    print(f"  Raw JSON: {otel_raw_path}")
     print(f"  Proxy Raw JSON: {proxy_result['path']}")
-    print(f"  Tidy OTEL JSON: {otel_tidy_path}")
     print(f"  Tidy Proxy JSON: {proxy_tidy_path}")
-    print(
-        f"  Spans: {export_stats['spans']}, metric points: {export_stats['metric_points']}, "
-        f"log records: {export_stats['log_records']}"
-    )
     print(
         f"  Proxy lines: {proxy_result['raw_lines']}, parsed records: {proxy_result['records']}, "
         f"invalid lines: {proxy_result['invalid_lines']}"
