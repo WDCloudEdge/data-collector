@@ -12,7 +12,7 @@ from openclaw_trace_enrich import run_openclaw_collect_and_enrich
 
 if __name__ == "__main__":
     # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test'， 'openclaw']
-    namespaces = ['bookinfo']
+    namespaces = ['hipster']
     # namespaces = ['horsecoder-test']
     config = Config()
 
