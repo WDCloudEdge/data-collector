@@ -8,6 +8,8 @@ import time
 from util.utils import *
 import os
 
+from openclaw_trace_enrich import run_openclaw_collect_and_enrich
+
 if __name__ == "__main__":
     # namespaces = ['bookinfo', 'hipster', 'hipster2', 'cloud-sock-shop', 'horsecoder-test'， 'openclaw']
     namespaces = ['bookinfo']
@@ -91,6 +93,10 @@ if __name__ == "__main__":
             count += 1
         # 将trace数据合并，写入到原文件中
         # pkl_concat.data_concat(data_folder, data_folder)
+
+    # OpenClaw：按 [config.start, config.end] 拉代理 jsonl → tidy，并用 Jaeger 对齐写入各 namespace 的 trace pkl
+    run_openclaw_collect_and_enrich(config, namespaces)
+
     data_folder = './data/' + str(config.user) + '/node'
     count = 1
     # now_time = global_now_time

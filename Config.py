@@ -1,3 +1,4 @@
+import os
 import time
 
 class Config:
@@ -69,6 +70,19 @@ class Config:
 
         # dir name
         self.user = '90user-5min'
+
+        # OpenClaw 代理：与 Main-Openclaw 相同日志路径；采集整文件后按 [start,end] 过滤
+        self.openclaw_enrich_enabled = True
+        self.openclaw_proxy_namespace = 'openclaw'
+        self.openclaw_proxy_container = ''  # 多容器时填容器名
+        self.openclaw_dashscope_deployment = os.getenv('OPENCLAW_APIKEY_PROXY_DEPLOYMENT', 'dashscope-proxy')
+        self.openclaw_ollama_deployment = os.getenv('OPENCLAW_OLLAMA_PROXY_DEPLOYMENT', 'ollama-proxy')
+        self.openclaw_dashscope_log_path = os.getenv(
+            'OPENCLAW_APIKEY_PROXY_LOG_PATH', '/var/log/dashscope-proxy/openclaw_proxy_raw.jsonl'
+        )
+        self.openclaw_ollama_log_path = os.getenv(
+            'OPENCLAW_OLLAMA_PROXY_LOG_PATH', '/var/log/ollama-proxy/openclaw_proxy_raw.jsonl'
+        )
 
 
 class Node:
