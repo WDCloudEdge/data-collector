@@ -42,22 +42,22 @@ class Config:
         # 70
         # self.end = 1774350480
         # 90
-        self.end = 1774435020
+        self.end = 1775405520
 
-        # python -c "import time; print(int(time.mktime(time.strptime('2026-03-24 22:55:00','%Y-%m-%d %H:%M:%S'))))"
+        # python3 -c "import time; print(int(time.mktime(time.strptime('2026-03-24 22:55:00','%Y-%m-%d %H:%M:%S'))))"
         self.start = self.end - self.duration
 
         # prometheus
         # self.prom_range_url = "http://192.168.31.227:30210/api/v1/query_range"  # istio支持
-        self.prom_range_url = "http://192.168.31.227:30200/api/v1/query_range"  # istio支持
+        self.prom_range_url = "http://192.168.31.227:30202/api/v1/query_range"  # istio支持
         self.prom_range_url_node = "http://192.168.31.227:30200/api/v1/query_range"  # 原生Prometheus
         self.prom_no_range_url_node = "http://192.168.31.227:30200/api/v1/query"
         # self.prom_no_range_url = "http://192.168.31.227:30210/api/v1/query"
-        self.prom_no_range_url = "http://192.168.31.227:30200/api/v1/query"
+        self.prom_no_range_url = "http://192.168.31.227:30202/api/v1/query"
         self.step = 5
 
         # jaeger
-        self.jaeger_url = 'http://192.168.31.218:16686/api/traces?'
+        self.jaeger_url = 'http://192.168.31.171:16686/api/traces?'
         self.lookBack = str(int(self.duration / 60)) + 'm'
         self.limit = 100000
 
