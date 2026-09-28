@@ -1,0 +1,19 @@
+load,chain_length,n,e2e_median_s,e2e_p90_s
+1 user (multi),1,4,13.6,16.2
+1 user (multi),3,24,31.6,68.7
+1 user (multi),4,1,22.1,22.1
+1 user (multi),5,4,50.5,53.8
+1 user (multi),6,1,23.1,23.1
+1 user (multi),7,1,93.2,93.2
+3 users (multi),1,6,12.8,17.9
+3 users (multi),3,72,28.3,73.8
+3 users (multi),4,4,21.8,53.7
+3 users (multi),5,11,62.3,81.3
+3 users (multi),6,3,75.7,76.2
+5 users (multi),1,30,14.9,75.1
+5 users (multi),3,122,61.3,110.0
+5 users (multi),4,12,40.1,81.3
+5 users (multi),5,11,64.5,70.4
+5 users (multi),6,1,183.6,183.6
+5 users (multi),7,1,112.0,112.0
+5 users (multi),8,1,131.3,131.3

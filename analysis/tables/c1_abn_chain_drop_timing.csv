@@ -1,0 +1,21 @@
+load,fault,service,svc_key,rel_onset,rel_end,preexisting
+3 users,cpu_load,planner,agent-network-planner,400.0,219.0,False
+3 users,cpu_load,summarizer,agent-network-summarizer,400.0,219.0,False
+3 users,mem_load,planner,agent-network-planner,,,False
+3 users,mem_load,summarizer,agent-network-summarizer,610.0,429.0,False
+3 users,net_latency,planner,agent-network-planner,-70.0,-251.0,True
+3 users,net_latency,summarizer,agent-network-summarizer,-75.0,-256.0,True
+3 users,pod_failure,planner,agent-network-planner,440.0,259.0,False
+3 users,pod_failure,summarizer,agent-network-summarizer,435.0,254.0,False
+3 users,pod_kill,planner,agent-network-planner,375.0,194.0,False
+3 users,pod_kill,summarizer,agent-network-summarizer,390.0,209.0,False
+5 users,cpu_load,planner,agent-network-planner,595.0,414.0,False
+5 users,cpu_load,summarizer,agent-network-summarizer,10.0,-171.0,False
+5 users,mem_load,planner,agent-network-planner,90.0,-91.0,False
+5 users,mem_load,summarizer,agent-network-summarizer,15.0,-166.0,False
+5 users,net_latency,planner,agent-network-planner,,,False
+5 users,net_latency,summarizer,agent-network-summarizer,110.0,-70.0,False
+5 users,pod_failure,planner,agent-network-planner,292.0,110.0,False
+5 users,pod_failure,summarizer,agent-network-summarizer,22.0,-160.0,False
+5 users,pod_kill,planner,agent-network-planner,159.0,-22.0,False
+5 users,pod_kill,summarizer,agent-network-summarizer,69.0,-112.0,False

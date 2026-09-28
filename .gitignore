@@ -53,5 +53,5 @@ Thumbs.db
 /mvnw
 venv/
 data*
-figures/
-tables/
+# figures/
+# tables/

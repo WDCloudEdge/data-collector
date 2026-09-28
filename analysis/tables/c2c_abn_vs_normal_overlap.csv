@@ -1,0 +1,81 @@
+service,load,condition,fault,metric,prefault_n,infault_n,prefault_mean,prefault_cv,prefault_p10,prefault_p90,infault_mean,infault_cv,infault_within_prefault_p10_p90_pct
+pdf-parsing,3 users,pdf-parsing 3u,cpu_load,CPU (mC),24,37,42.604769,0.802677,9.564951,88.709132,384.744932,0.462542,18.918919
+pdf-parsing,3 users,pdf-parsing 3u,cpu_load,Memory (MB),24,37,212.644181,0.106500,189.284352,241.967104,273.073014,0.037617,2.702703
+pdf-parsing,3 users,pdf-parsing 3u,cpu_load,Latency p99 (ms),0,0,,,,,,,
+pdf-parsing,3 users,pdf-parsing 3u,cpu_load,Success rate,0,0,,,,,,,
+pdf-parsing,3 users,pdf-parsing 3u,mem_load,CPU (mC),24,37,11.596512,0.378689,7.238279,18.044147,335.714384,0.625377,24.324324
+pdf-parsing,3 users,pdf-parsing 3u,mem_load,Memory (MB),24,37,286.571520,0.000679,286.425088,286.885069,466.629715,0.514840,0.000000
+pdf-parsing,3 users,pdf-parsing 3u,mem_load,Latency p99 (ms),0,0,,,,,,,
+pdf-parsing,3 users,pdf-parsing 3u,mem_load,Success rate,0,0,,,,,,,
+pdf-parsing,3 users,pdf-parsing 3u,net_latency,CPU (mC),24,37,10.056582,0.550478,5.909874,19.536180,15.106584,0.528655,67.567568
+pdf-parsing,3 users,pdf-parsing 3u,net_latency,Memory (MB),24,37,288.862720,0.000416,288.768000,289.017856,289.397345,0.000983,8.108108
+pdf-parsing,3 users,pdf-parsing 3u,net_latency,Latency p99 (ms),6,21,9950.000000,0.000000,9950.000000,9950.000000,52592.857143,0.331012,14.285714
+pdf-parsing,3 users,pdf-parsing 3u,net_latency,Success rate,12,32,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+pdf-parsing,3 users,pdf-parsing 3u,pod_failure,CPU (mC),24,37,11.572764,0.343905,6.128803,16.371654,0.626158,3.355306,8.108108
+pdf-parsing,3 users,pdf-parsing 3u,pod_failure,Memory (MB),24,37,288.023040,0.000106,287.989760,288.063488,25.008958,3.124451,8.108108
+pdf-parsing,3 users,pdf-parsing 3u,pod_failure,Latency p99 (ms),9,6,16566.666667,0.564832,9950.000000,29800.000000,19875.000000,0.499371,100.000000
+pdf-parsing,3 users,pdf-parsing 3u,pod_failure,Success rate,15,18,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+pdf-parsing,3 users,pdf-parsing 3u,pod_kill,CPU (mC),24,37,11.315637,0.476203,4.824665,20.052680,6.273839,0.979198,59.459459
+pdf-parsing,3 users,pdf-parsing 3u,pod_kill,Memory (MB),24,37,202.829312,0.016686,199.581696,208.046899,146.334471,0.445545,0.000000
+pdf-parsing,3 users,pdf-parsing 3u,pod_kill,Latency p99 (ms),6,6,19775.000000,0.496839,9950.000000,29600.000000,19875.000000,0.499371,50.000000
+pdf-parsing,3 users,pdf-parsing 3u,pod_kill,Success rate,13,17,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+pdf-parsing,5 users,pdf-parsing 5u,cpu_load,CPU (mC),24,37,55.946998,1.050201,6.204625,132.337218,390.914152,0.441578,21.621622
+pdf-parsing,5 users,pdf-parsing 5u,cpu_load,Memory (MB),24,37,200.390997,0.186517,171.212800,268.419072,275.077397,0.012618,5.405405
+pdf-parsing,5 users,pdf-parsing 5u,cpu_load,Latency p99 (ms),0,35,,,,,26281.428571,0.282773,
+pdf-parsing,5 users,pdf-parsing 5u,cpu_load,Success rate,0,35,,,,,1.000000,0.000000,
+pdf-parsing,5 users,pdf-parsing 5u,mem_load,CPU (mC),24,37,43.518564,0.814149,5.398519,76.140462,369.043428,0.480519,0.000000
+pdf-parsing,5 users,pdf-parsing 5u,mem_load,Memory (MB),24,37,200.575659,0.142983,171.438080,233.512960,610.294369,0.577843,0.000000
+pdf-parsing,5 users,pdf-parsing 5u,mem_load,Latency p99 (ms),1,34,29600.000000,,29600.000000,29600.000000,29658.088235,0.005429,5.882353
+pdf-parsing,5 users,pdf-parsing 5u,mem_load,Success rate,1,37,1.000000,,1.000000,1.000000,1.000000,0.000000,100.000000
+pdf-parsing,5 users,pdf-parsing 5u,net_latency,CPU (mC),24,36,61.390858,0.795874,5.985585,124.477384,19.515863,1.529385,27.777778
+pdf-parsing,5 users,pdf-parsing 5u,net_latency,Memory (MB),24,36,209.004203,0.176361,169.414656,253.583360,260.728377,0.003596,0.000000
+pdf-parsing,5 users,pdf-parsing 5u,net_latency,Latency p99 (ms),8,16,29612.500000,0.003967,29466.666667,29733.333333,79937.500000,1.308043,81.250000
+pdf-parsing,5 users,pdf-parsing 5u,net_latency,Success rate,8,22,1.000000,0.000000,1.000000,1.000000,0.941558,0.074598,59.090909
+pdf-parsing,5 users,pdf-parsing 5u,pod_failure,CPU (mC),27,36,56.298940,0.694898,5.768582,102.152862,2.839697,5.911542,2.777778
+pdf-parsing,5 users,pdf-parsing 5u,pod_failure,Memory (MB),27,36,210.484186,0.167756,168.751104,258.740224,8.723228,4.845285,2.777778
+pdf-parsing,5 users,pdf-parsing 5u,pod_failure,Latency p99 (ms),11,24,29696.969697,0.001666,29666.666667,29777.777778,23477.777778,0.512998,16.666667
+pdf-parsing,5 users,pdf-parsing 5u,pod_failure,Success rate,11,16,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+pdf-parsing,5 users,pdf-parsing 5u,pod_kill,CPU (mC),26,36,64.961119,0.634298,5.385205,118.155229,71.234568,1.022087,66.666667
+pdf-parsing,5 users,pdf-parsing 5u,pod_kill,Memory (MB),26,36,222.173342,0.166039,170.938368,263.090176,180.694357,0.451263,72.222222
+pdf-parsing,5 users,pdf-parsing 5u,pod_kill,Latency p99 (ms),2,36,29533.333333,0.000000,29533.333333,29533.333333,28585.648148,0.158175,2.777778
+pdf-parsing,5 users,pdf-parsing 5u,pod_kill,Success rate,2,36,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+planner,5 users,planner 5u,cpu_load,CPU (mC),24,36,79.131515,0.701526,4.270543,142.582298,422.309204,0.332174,0.000000
+planner,5 users,planner 5u,cpu_load,Memory (MB),24,36,222.568107,0.174368,163.979264,260.571136,302.546034,0.082860,0.000000
+planner,5 users,planner 5u,cpu_load,Latency p99 (ms),10,36,29788.285714,0.000590,29776.285714,29800.000000,29793.121693,0.000580,69.444444
+planner,5 users,planner 5u,cpu_load,Success rate,10,36,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+planner,5 users,planner 5u,mem_load,CPU (mC),24,37,92.163123,0.529249,5.937936,140.924813,215.060651,0.142621,0.000000
+planner,5 users,planner 5u,mem_load,Memory (MB),24,37,227.721557,0.170981,163.041280,263.512064,682.515926,0.440238,0.000000
+planner,5 users,planner 5u,mem_load,Latency p99 (ms),11,22,37054.545455,0.319708,29800.000000,56400.000000,74390.909091,1.204601,59.090909
+planner,5 users,planner 5u,mem_load,Success rate,11,31,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+planner,5 users,planner 5u,net_latency,CPU (mC),24,37,97.380591,0.661355,9.711970,158.622868,35.311922,1.358410,51.351351
+planner,5 users,planner 5u,net_latency,Memory (MB),24,37,223.136768,0.199697,165.604557,275.003392,291.431064,0.023992,0.000000
+planner,5 users,planner 5u,net_latency,Latency p99 (ms),11,13,29800.000000,0.000000,29800.000000,29800.000000,29800.000000,0.000000,76.923077
+planner,5 users,planner 5u,net_latency,Success rate,11,13,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+planner,5 users,planner 5u,pod_failure,CPU (mC),26,36,92.308839,0.591429,6.805531,140.432688,18.146904,2.828229,0.000000
+planner,5 users,planner 5u,pod_failure,Memory (MB),26,36,223.470198,0.190395,163.139584,268.832768,32.879957,2.658862,0.000000
+planner,5 users,planner 5u,pod_failure,Latency p99 (ms),13,36,29794.871795,0.000314,29777.777778,29800.000000,11588.888889,1.253566,38.888889
+planner,5 users,planner 5u,pod_failure,Success rate,13,14,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+planner,5 users,planner 5u,pod_kill,CPU (mC),25,36,106.071353,0.624404,7.978324,179.789104,96.871134,0.733898,69.444444
+planner,5 users,planner 5u,pod_kill,Memory (MB),25,36,237.714801,0.222341,161.734656,292.315136,195.040597,0.360720,50.000000
+planner,5 users,planner 5u,pod_kill,Latency p99 (ms),0,33,,,,,29795.959596,0.000288,
+planner,5 users,planner 5u,pod_kill,Success rate,0,33,,,,,1.000000,0.000000,
+summarizer,5 users,summarizer 5u,cpu_load,CPU (mC),24,37,25.765816,0.866405,5.408174,61.288996,394.796815,0.460396,10.810811
+summarizer,5 users,summarizer 5u,cpu_load,Memory (MB),24,37,192.005120,0.174056,161.579008,232.886272,290.863713,0.079170,0.000000
+summarizer,5 users,summarizer 5u,cpu_load,Latency p99 (ms),5,37,21004.000000,0.431261,9910.000000,28400.000000,16670.144788,0.803519,59.459459
+summarizer,5 users,summarizer 5u,cpu_load,Success rate,5,37,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+summarizer,5 users,summarizer 5u,mem_load,CPU (mC),24,37,23.954075,0.770813,7.117235,53.149141,348.487371,0.430869,13.513514
+summarizer,5 users,summarizer 5u,mem_load,Memory (MB),24,37,201.549312,0.172644,164.290560,237.764608,629.253978,0.415336,0.000000
+summarizer,5 users,summarizer 5u,mem_load,Latency p99 (ms),11,37,18313.636364,0.513115,9550.000000,29000.000000,13286.949807,0.528811,100.000000
+summarizer,5 users,summarizer 5u,mem_load,Success rate,11,37,1.000000,0.000000,1.000000,1.000000,0.978185,0.039510,75.675676
+summarizer,5 users,summarizer 5u,net_latency,CPU (mC),24,37,24.753450,0.660674,6.850645,44.700083,14.359953,0.889713,70.270270
+summarizer,5 users,summarizer 5u,net_latency,Memory (MB),24,37,205.259435,0.155368,162.992128,248.975360,283.401908,0.056722,5.405405
+summarizer,5 users,summarizer 5u,net_latency,Latency p99 (ms),6,18,9762.500000,0.011524,9650.000000,9875.000000,81841.666667,1.207838,16.666667
+summarizer,5 users,summarizer 5u,net_latency,Success rate,6,24,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+summarizer,5 users,summarizer 5u,pod_failure,CPU (mC),25,36,70.154231,0.908897,11.714517,175.437282,15.522596,2.489980,13.888889
+summarizer,5 users,summarizer 5u,pod_failure,Memory (MB),25,36,183.838147,0.186759,148.459520,219.918336,32.412444,2.489980,0.000000
+summarizer,5 users,summarizer 5u,pod_failure,Latency p99 (ms),13,14,20063.461538,0.467777,9933.333333,29400.000000,20150.000000,0.438385,100.000000
+summarizer,5 users,summarizer 5u,pod_failure,Success rate,13,20,1.000000,0.000000,1.000000,1.000000,1.000000,0.000000,100.000000
+summarizer,5 users,summarizer 5u,pod_kill,CPU (mC),25,37,23.617306,0.829553,4.729493,55.709680,64.306539,1.177999,51.351351
+summarizer,5 users,summarizer 5u,pod_kill,Memory (MB),25,37,197.305382,0.169167,162.926016,231.824832,212.299326,0.444750,16.216216
+summarizer,5 users,summarizer 5u,pod_kill,Latency p99 (ms),0,37,,,,,11059.787645,0.504601,
+summarizer,5 users,summarizer 5u,pod_kill,Success rate,0,37,,,,,0.975412,0.052012,

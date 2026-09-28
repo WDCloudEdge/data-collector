@@ -1,0 +1,7 @@
+load,response,peak_lag_s,peak_corr
+1 user,CPU,-45,0.56
+1 user,Memory,-45,0.21
+3 users,CPU,55,0.72
+3 users,Memory,40,0.3
+5 users,CPU,30,0.81
+5 users,Memory,35,0.15

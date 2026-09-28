@@ -1,0 +1,6 @@
+fault,fault_duration_s,faulted_svc_success_min,faulted_svc_valid_samples,faulted_svc_infault_valid_samples,faulted_svc_infault_total_samples,downstream_drops,first_drop_from_fault_start_s,first_drop_lag_after_fault_end_s,first_post_start_drop_from_fault_start_s,preexisting_drop,clean_post_fault_onset
+cpu_load,181,1.0,66,0,37,"planner,summarizer",400,219,400,False,True
+mem_load,181,1.0,63,0,37,summarizer,610,429,610,False,True
+net_latency,181,1.0,57,32,37,"planner,summarizer",-75,-256,120,True,False
+pod_failure,181,1.0,33,18,37,"planner,summarizer",435,254,435,False,True
+pod_kill,181,1.0,53,17,37,"planner,summarizer",375,194,375,False,True
