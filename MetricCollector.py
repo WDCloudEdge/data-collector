@@ -5,6 +5,16 @@ from util.PrometheusClient import PrometheusClient
 from util.KubernetesClient import KubernetesClient
 
 
+def _write_metric_csv(metric_df: pd.DataFrame, path: str, is_header: bool, missing_value=-1):
+    """Write metrics after replacing every NaN-like value with its sentinel."""
+    metric_df = metric_df.copy()
+    metric_columns = [column for column in metric_df.columns if column != 'timestamp']
+    metric_df[metric_columns] = metric_df[metric_columns].replace(
+        r'(?i)^\s*nan\s*$', float('nan'), regex=True
+    ).fillna(missing_value)
+    metric_df.to_csv(path, index=False, mode='a', header=is_header)
+
+
 def collect_graph(config: Config, _dir: str, is_header: bool):
     graph_df = pd.DataFrame(columns=['source', 'destination'])
     prom_util = PrometheusClient(config)
@@ -82,7 +92,7 @@ def collect_call_latency(config: Config, _dir: str, is_header: bool):
         metric = values[1]
         key = name + '&' + type
         call_df[key] = pd.Series(metric)
-        call_df[key] = call_df[key].fillna(0)
+        call_df[key] = call_df[key].fillna(-1)
         call_df[key] = call_df[key].astype('float64')
 
     [handle(result, call_df, 'p50') for result in responses_50]
@@ -90,7 +100,7 @@ def collect_call_latency(config: Config, _dir: str, is_header: bool):
     [handle(result, call_df, 'p99') for result in responses_99]
 
     path = os.path.join(_dir, 'call.csv')
-    call_df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(call_df, path, is_header)
 
 
 # Get the response time for the microservices
@@ -117,7 +127,7 @@ def collect_svc_latency(config: Config, _dir: str, is_header: bool):
         metric = values[1]
         key = name + '&' + type
         latency_df[key] = pd.Series(metric)
-        latency_df[key] = latency_df[key].fillna(0)
+        latency_df[key] = latency_df[key].fillna(-1)
         latency_df[key] = latency_df[key].astype('float64')
 
     [handle(result, latency_df, 'p50') for result in responses_50]
@@ -125,7 +135,7 @@ def collect_svc_latency(config: Config, _dir: str, is_header: bool):
     [handle(result, latency_df, 'p99') for result in responses_99]
 
     path = os.path.join(_dir, 'latency.csv')
-    latency_df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(latency_df, path, is_header)
 
 
 # 获取机器的vCPU和memory使用
@@ -146,14 +156,14 @@ def collect_resource_metric(config: Config, _dir: str, is_header: bool):
             metric_df['timestamp'] = metric_df['timestamp'].astype('datetime64[s]')
         metric = values[1]
         metric_df[col] = pd.Series(metric)
-        metric_df[col] = metric_df[col].fillna(0)
+        metric_df[col] = metric_df[col].fillna(-1)
         metric_df[col] = metric_df[col].astype('float64')
 
     [handle(result, metric_df, 'vCPU') for result in vCPU]
     [handle(result, metric_df, 'memory') for result in mem]
 
     path = os.path.join(_dir, 'resource.csv')
-    metric_df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(metric_df, path, is_header)
 
 
 # Get the number of pods for all microservices
@@ -194,7 +204,7 @@ def collect_pod_num(config: Config, _dir: str, is_header: bool):
     instance_num_df['timestamp'] = instance_df['timestamp']
 
     path = os.path.join(_dir, 'instances_num.csv')
-    instance_num_df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(instance_num_df, path, is_header)
 
 
 # get qps for microservice
@@ -214,13 +224,13 @@ def collect_svc_qps(config: Config, _dir: str, is_header: bool):
             qps_df['timestamp'] = qps_df['timestamp'].astype('datetime64[s]')
         metric = values[1]
         qps_df[name] = pd.Series(metric)
-        qps_df[name] = qps_df[name].fillna(0)
+        qps_df[name] = qps_df[name].fillna(-1)
         qps_df[name] = qps_df[name].astype('float64')
 
     [handle(result, qps_df) for result in response]
 
     path = os.path.join(_dir, 'svc_qps.csv')
-    qps_df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(qps_df, path, is_header)
 
 
 # Get metric for microservices
@@ -228,7 +238,7 @@ def collect_svc_metric(config: Config, _dir: str, is_header: bool):
     prom_util = PrometheusClient(config)
     final_df = prom_util.get_svc_metric_range()
     path = os.path.join(_dir, 'svc_metric.csv')
-    final_df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(final_df, path, is_header)
 
 
 # 收集容器CPU, memory, network
@@ -302,7 +312,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         cpu_df = cpu_df.fillna(0)
     cpu_df = cpu_df.sort_values(by='timestamp')
     cpu_df = cpu_df.reset_index(drop=True)
-    # cpu_df = cpu_df.mask((cpu_df == 0) & (pod_df == 0), -1)
+    cpu_df = cpu_df.mask(((cpu_df == 0) & (pod_df == 0)).fillna(False).astype(bool), -1)
     cpu_df.rename(columns=cpu_rename, inplace=True)
 
     mem_rename = {}
@@ -335,7 +345,7 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         mem_df = mem_df.fillna(0)
     mem_df = mem_df.sort_values(by='timestamp')
     mem_df = mem_df.reset_index(drop=True)
-    # mem_df = mem_df.mask((mem_df == 0) & (pod_df == 0), -1)
+    mem_df = mem_df.mask(((mem_df == 0) & (pod_df == 0)).fillna(False).astype(bool), -1)
     mem_df.rename(columns=mem_rename, inplace=True)
 
     net_rename = {}
@@ -365,13 +375,13 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         net_df = net_df.fillna(0)
     net_df = net_df.sort_values(by='timestamp')
     net_df = net_df.reset_index(drop=True)
-    # net_df = net_df.mask((net_df == 0) & (pod_df == 0), -1)
+    net_df = net_df.mask(((net_df == 0) & (pod_df == 0)).fillna(False).astype(bool), -1)
     net_df.rename(columns=net_rename, inplace=True)
 
     df = pd.merge(cpu_df, mem_df, on='timestamp', how='outer')
     df = pd.merge(df, net_df, on='timestamp', how='outer')
     path = os.path.join(_dir, 'instance.csv')
-    df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(df, path, is_header)
     return df
 
 
@@ -398,7 +408,7 @@ def collect_succeess_rate(config: Config, _dir: str, is_header: bool):
     [handle(result, success_df) for result in response]
 
     path = os.path.join(_dir, 'success_rate.csv')
-    success_df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(success_df, path, is_header)
 
 
 def collect_node_metric(config: Config, _dir: str, is_header: bool):
@@ -421,12 +431,12 @@ def collect_node_metric(config: Config, _dir: str, is_header: bool):
         col_name = '(node)' + node.name + '_network'
         node_df[col_name] = metric
         node_df[col_name] = node_df[col_name].astype('float64')
-        node_df = node_df.fillna(0)
+        node_df = node_df.fillna(-1)
         if df.empty:
             df = node_df
         else:
             df = pd.merge(df, node_df, on='timestamp', how='outer')
-        df = df.fillna(0)
+        df = df.fillna(-1)
 
         # prom_sql = 'rate(node_network_transmit_packets_total{device="raven0", instance="%s"}[3m]) / 1000' % node.node_name
         # response = prom_util.execute_prom(config.prom_range_url_node, prom_sql)
@@ -444,7 +454,7 @@ def collect_node_metric(config: Config, _dir: str, is_header: bool):
             df = node_df
         else:
             df = pd.merge(df, node_df, on='timestamp', how='outer')
-        df = df.fillna(0)
+        df = df.fillna(-1)
 
         prom_sql = '1-(sum(increase(node_cpu_seconds_total{instance="%s",mode="idle"}[1m]))/sum(increase(node_cpu_seconds_total{instance="%s"}[1m])))' % (
             node.node_name, node.node_name)
@@ -458,12 +468,12 @@ def collect_node_metric(config: Config, _dir: str, is_header: bool):
         col_name = '(node)' + node.name + '_cpu'
         node_df[col_name] = metric
         node_df[col_name] = node_df[col_name].astype('float64')
-        node_df = node_df.fillna(0)
+        node_df = node_df.fillna(-1)
         if df.empty:
             df = node_df
         else:
             df = pd.merge(df, node_df, on='timestamp', how='outer')
-        df = df.fillna(0)
+        df = df.fillna(-1)
 
         prom_sql = '(node_memory_MemTotal_bytes{instance="%s"}-(node_memory_MemFree_bytes{instance="%s"}+ node_memory_Cached_bytes{instance="%s"} + node_memory_Buffers_bytes{instance="%s"})) / node_memory_MemTotal_bytes{instance="%s"}' % (
             node.node_name, node.node_name, node.node_name, node.node_name, node.node_name)
@@ -477,15 +487,15 @@ def collect_node_metric(config: Config, _dir: str, is_header: bool):
         col_name = '(node)' + node.name + '_memory'
         node_df[col_name] = metric
         node_df[col_name] = node_df[col_name].astype('float64')
-        node_df = node_df.fillna(0)
+        node_df = node_df.fillna(-1)
         if df.empty:
             df = node_df
         else:
             df = pd.merge(df, node_df, on='timestamp', how='outer')
-        df = df.fillna(0)
+        df = df.fillna(-1)
 
     path = os.path.join(_dir, 'node.csv')
-    df.to_csv(path, index=False, mode='a', header=is_header)
+    _write_metric_csv(df, path, is_header)
 
     return df
 
