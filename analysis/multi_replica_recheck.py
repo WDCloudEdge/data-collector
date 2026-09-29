@@ -22,8 +22,8 @@ Outputs:
 import os
 import numpy as np
 import pandas as pd
-from common import (plt, FIG, TAB, mpath, cv_series, cv_pos,
-                    load_traces, trace_node_times, save_fig)
+from common import (plt, FIG, TAB, COLORS, PALETTE, mpath, cv_series, cv_pos,
+                    load_traces, trace_node_times, save_fig, scale_figure_text)
 
 SAMPLE_SEC = 5
 
@@ -77,9 +77,6 @@ FIG_MULTI = {
     "3 users": "data/thingo/normal/20260913-14.10-14.15-normal-thingo-3user-5min-multi-14.20",
     "5 users": "data/thingo/normal/20260907-22.45-22.50-normal-thingo-5user-5min-multi-23.00",
 }
-PALETTE = {"1 user": "#4C72B0", "3 users": "#55A868", "5 users": "#DD8452"}
-
-
 def lag_recheck():
     # peak-lag table: single vs multi (1 & 5 users) — feeds the recheck tables
     rows = []
@@ -108,14 +105,13 @@ def lag_recheck():
             ax.plot(lags, vals, marker="o", ms=3, color=PALETTE[name],
                     label=f"{name} (peak {peak:+d}s, r={pr:.2f})")
             ax.axvline(peak, ls="--", alpha=.4, color=PALETTE[name])
-        ax.axvline(0, color="grey", lw=.8)
-        ax.set_title(title)
+        ax.axvline(0, color=COLORS["reference"], lw=.8)
+        # ax.set_title(title)
         ax.set_xlabel("Metric lag (s)")
         ax.grid(ls=":", alpha=.5)
         ax.legend(fontsize=8, title="Normal workload")
     axc.set_ylabel("Cross-correlation")
-    fig.suptitle("Metric lag varies between CPU and memory under different normal workload settings.",
-                 fontsize=11)
+    scale_figure_text(fig, 2)
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     save_fig(fig, "recheck_lag_ccf")
     plt.close(fig)

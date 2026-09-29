@@ -14,8 +14,10 @@ import collections
 import numpy as np
 import pandas as pd
 import matplotlib
+from cycler import cycler
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: F401  (re-exported for scripts)
+from matplotlib.text import Text
 
 # ---- paper font: Times New Roman, vector PDF with embedded fonts ----
 matplotlib.rcParams["font.family"] = "serif"
@@ -24,6 +26,25 @@ matplotlib.rcParams["mathtext.fontset"] = "dejavuserif"
 matplotlib.rcParams["axes.unicode_minus"] = False
 matplotlib.rcParams["pdf.fonttype"] = 42   # embed TrueType (editable/vector text)
 matplotlib.rcParams["ps.fonttype"] = 42
+
+# Okabe-Ito-inspired colors for clear separation in print and for color-vision deficiency.
+PALETTE = {"1 user": "#0072B2", "3 users": "#009E73", "5 users": "#D55E00"}
+COLORS = {
+    "trace": "#0072B2",
+    "trace_p99": "#005A8D",
+    "metric_p50": "#E69F00",
+    "metric_p99": "#D55E00",
+    "metric_distinct": "#D55E00",
+    "cpu": "#0072B2",
+    "memory": "#E69F00",
+    "coverage": "#009E73",
+    "entry": "#333333",
+    "middle": "#0072B2",
+    "exit": "#D55E00",
+    "variance": "#0072B2",
+    "reference": "#666666",
+}
+matplotlib.rcParams["axes.prop_cycle"] = cycler(color=list(PALETTE.values()))
 
 # ---- paths ----
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -38,6 +59,12 @@ def save_fig(fig, name):
     fig.savefig(os.path.join(FIG, name + ".pdf"))          # vector
     fig.savefig(os.path.join(FIG, name + ".png"), dpi=160)  # raster preview
 
+
+def scale_figure_text(fig, factor=2):
+    """Scale all text in one figure without changing other figures."""
+    for text in fig.findobj(match=Text):
+        text.set_fontsize(text.get_fontsize() * factor)
+
 # ---- datasets (NORMAL runs, 1/3/5 concurrent users, single-replica) ----
 # NOTE: loads are 1/3/5 users. The 10-user runs were dropped: 10 users overloads the
 # system and its data is distorted (survivorship/partial-timing artifacts), so 3-user
@@ -49,7 +76,6 @@ DATASETS = {
     "5 users": "data/thingo/normal/20260904-14.30-14.35-normal-thingo-5user-5min_14.50",
 }
 ORDER = list(DATASETS.keys())
-PALETTE = {"1 user": "#4C72B0", "3 users": "#55A868", "5 users": "#DD8452"}
 SAMPLE_SEC = 5  # metric sampling interval
 
 

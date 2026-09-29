@@ -21,7 +21,7 @@ Outputs -> analysis/figures/joint_*.png , analysis/tables/joint_*.csv
 import os
 import numpy as np
 import pandas as pd
-from common import (plt, FIG, TAB, DATASETS, mpath, load_traces,
+from common import (plt, FIG, TAB, DATASETS, COLORS, mpath, load_traces,
                     trace_node_times, cv_pos as cv, save_fig)
 
 # trace vertex group  ->  metric service column stem (agent-network-<svc>)
@@ -89,12 +89,12 @@ def fig_real_vs_metric(tab):
     fig, ax = plt.subplots(figsize=(11, 5.2))
     ax.set_yscale("log")
     # real trace: median with p50..p99 whisker
-    ax.vlines(x - 0.12, sub.trace_median_s, sub.trace_p99_s, color="#4C72B0", lw=6, alpha=.35)
-    ax.plot(x - 0.12, sub.trace_median_s, "o", color="#4C72B0", label="Trace completion time, median (s)")
-    ax.plot(x - 0.12, sub.trace_p99_s, "_", color="#2A4B7C", ms=12, label="Trace completion time, p99 (s)")
+    ax.vlines(x - 0.12, sub.trace_median_s, sub.trace_p99_s, color=COLORS["trace"], lw=6, alpha=.35)
+    ax.plot(x - 0.12, sub.trace_median_s, "o", color=COLORS["trace"], label="Trace completion time, median (s)")
+    ax.plot(x - 0.12, sub.trace_p99_s, "_", color=COLORS["trace_p99"], ms=12, label="Trace completion time, p99 (s)")
     # metric latency: p50 & p99 medians
-    ax.plot(x + 0.12, sub.metric_p50_median_s, "s", color="#DD8452", label="Metric latency p50, median (s)")
-    ax.plot(x + 0.12, sub.metric_p99_median_s, "D", color="#C44E52", label="Metric latency p99, median (s)")
+    ax.plot(x + 0.12, sub.metric_p50_median_s, "s", color=COLORS["metric_p50"], label="Metric latency p50, median (s)")
+    ax.plot(x + 0.12, sub.metric_p99_median_s, "D", color=COLORS["metric_p99"], label="Metric latency p99, median (s)")
     ax.set_xticks(x)
     ax.set_xticklabels(svcs, rotation=25, ha="right")
     ax.set_ylabel("Time (s, log scale)")
@@ -113,16 +113,16 @@ def fig_quant_coverage(tab):
     y = np.arange(len(svcs))
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
     # left: quantization — distinct metric values vs distinct-ish real (invocations)
-    axes[0].barh(y - 0.2, sub.metric_distinct_vals, 0.4, color="#C44E52", label="Distinct metric latency values")
-    axes[0].barh(y + 0.2, sub.trace_invocations, 0.4, color="#4C72B0", label="Trace invocations")
+    axes[0].barh(y - 0.2, sub.metric_distinct_vals, 0.4, color=COLORS["metric_distinct"], label="Distinct metric latency values")
+    axes[0].barh(y + 0.2, sub.trace_invocations, 0.4, color=COLORS["trace"], label="Trace invocations")
     axes[0].set_yticks(y); axes[0].set_yticklabels(svcs, fontsize=8)
     axes[0].set_xscale("log")
     axes[0].set_xlabel("Count (log scale)")
     axes[0].set_title("The latency metric collapses onto only a few discrete bucket values per service.")
     axes[0].legend(fontsize=8); axes[0].grid(axis="x", ls=":", alpha=.5)
     # right: coverage ratio
-    axes[1].barh(y, sub.coverage_ratio, color="#55A868", alpha=.85)
-    axes[1].axvline(1.0, ls="--", color="grey")
+    axes[1].barh(y, sub.coverage_ratio, color=COLORS["coverage"], alpha=.85)
+    axes[1].axvline(1.0, ls="--", color=COLORS["reference"])
     axes[1].set_yticks(y); axes[1].set_yticklabels(svcs, fontsize=8)
     axes[1].set_xlabel("Metric non-null windows / trace invocations")
     axes[1].set_title("The number of metric windows is not proportional to the real invocation count.")

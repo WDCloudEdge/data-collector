@@ -21,8 +21,8 @@ import os
 import collections
 import numpy as np
 import pandas as pd
-from common import (plt, FIG, TAB, DATASETS, ORDER, PALETTE,
-                    load_traces, cv_pos as cv, save_fig)
+from common import (plt, FIG, TAB, DATASETS, ORDER, PALETTE, COLORS,
+                    load_traces, cv_pos as cv, save_fig, scale_figure_text)
 
 
 # ===================================================================
@@ -66,6 +66,7 @@ def chain_c1(data):
     np.atleast_1d(axes)[0].set_ylabel("End-to-end completion time (s)")
     fig.suptitle("The end-to-end completion time grows with the call chain length under multi-replica deployment.",
                  fontsize=11)
+    scale_figure_text(fig, 2)
     fig.tight_layout(rect=[0, 0, 1, 0.9])
     save_fig(fig, "c1_completion_by_length")
     plt.close(fig)
@@ -86,8 +87,8 @@ def chain_c1(data):
                         patch_artist=True, showfliers=False)
         for patch in bp["boxes"]:
             patch.set_facecolor(C1_COLOR[name]); patch.set_alpha(.7)
-        ax.set_title(name)
-        ax.set_xlabel("Call chain depth (position)")
+        ax.set_title(name.replace(" (multi)", ""))
+        ax.set_xlabel("Call chain depth")
         ax.grid(axis="y", ls=":", alpha=.5)
         for d in depths:
             v = np.array(by_depth[d])
@@ -96,9 +97,8 @@ def chain_c1(data):
                               "p90_s": round(float(np.percentile(v, 90)), 1),
                               "iqr_s": round(float(np.percentile(v, 75) - np.percentile(v, 25)), 1)})
     np.atleast_1d(axes)[0].set_ylabel("Cumulative completion time (s)")
-    fig.suptitle("The cumulative completion time accumulates with call chain depth and becomes later and more dispersed.",
-                 fontsize=11)
-    fig.tight_layout(rect=[0, 0, 1, 0.9])
+    scale_figure_text(fig, 2)
+    fig.tight_layout()
     save_fig(fig, "c1r_completion_by_depth")
     plt.close(fig)
     pd.DataFrame(depth_tab).to_csv(os.path.join(TAB, "chain_completion_by_depth.csv"), index=False)
@@ -142,9 +142,9 @@ def chain_c1(data):
     ax.set_xticks(xs)
     ax.set_xlabel("Call chain length (total levels)")
     ax.set_ylabel("Number of traces")
-    ax.set_title("The call chain length varies widely across requests, showing highly dynamic execution paths.")
     ax.legend(title="User Workload")
     ax.grid(axis="y", ls=":", alpha=.5)
+    scale_figure_text(fig, 2)
     fig.tight_layout()
     save_fig(fig, "c1r_chain_dynamism")
     plt.close(fig)
@@ -187,8 +187,7 @@ def chain_c2(data):
     # left: coverage bars (5 users), sorted
     sub = vt[vt.load == "5 users"].sort_values("coverage", ascending=True)
     axes[0].barh(sub["vertex"], sub["coverage"] * 100, color=PALETTE["5 users"], alpha=.8)
-    axes[0].set_xlabel("Percentage of traces covering the service (%)")
-    axes[0].set_title("Agent service invocation frequency at a user load of 5.")
+    axes[0].set_xlabel("Percentage of traces\ncovering the service (%)")
     axes[0].tick_params(axis="y", labelsize=7)
     axes[0].grid(axis="x", ls=":", alpha=.5)
 
@@ -197,13 +196,13 @@ def chain_c2(data):
     data_cv = [vt[vt.vertex == k]["time_cv"].dropna().values for k in kinds]
     data_cv = [d for d in data_cv if len(d)]
     allcv = vt.groupby("vertex")["time_cv"].mean().sort_values(ascending=True)
-    axes[1].barh(allcv.index, allcv.values, color="#C44E52", alpha=.8)
-    axes[1].axvline(1.0, ls="--", color="grey")
-    axes[1].set_xlabel("Coefficient of variation of execution time (CV) = σ/μ (standard deviation/mean)")
-    axes[1].set_title("Differences in execution times among different agent services")
+    axes[1].barh(allcv.index, allcv.values, color=COLORS["variance"], alpha=.8)
+    axes[1].axvline(1.0, ls="--", color=COLORS["reference"])
+    axes[1].set_xlabel("Coefficient of variation of execution time\n(CV) = σ/μ (standard deviation/mean)")
     axes[1].tick_params(axis="y", labelsize=7)
     axes[1].grid(axis="x", ls=":", alpha=.5)
-    fig.tight_layout()
+    scale_figure_text(fig, 2)
+    fig.tight_layout(w_pad=2.0)
     save_fig(fig, "c2r_vertex_sparsity_variance")
     plt.close(fig)
     return vt

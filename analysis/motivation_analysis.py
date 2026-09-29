@@ -19,8 +19,9 @@ Outputs:
 import os
 import numpy as np
 import pandas as pd
-from common import (plt, FIG, TAB, DATASETS, ORDER, PALETTE, SAMPLE_SEC,
-                    mpath, cv_series as cv, load_traces, trace_node_times, save_fig)
+from common import (plt, FIG, TAB, DATASETS, ORDER, PALETTE, COLORS, SAMPLE_SEC,
+                    mpath, cv_series as cv, load_traces, trace_node_times, save_fig,
+                    scale_figure_text)
 
 
 # ===================================================================
@@ -63,9 +64,9 @@ def sparsity():
     ax.set_xticks(x)
     ax.set_xticklabels(metrics, rotation=12)
     ax.set_ylabel("Proportion of valid information (%)")
-    ax.set_title("Sparsity of service level metrics under different user loads.")
     ax.legend(title="User Workload")
     ax.grid(axis="y", ls=":", alpha=.5)
+    scale_figure_text(fig, 2)
     fig.tight_layout()
     save_fig(fig, "c2_sparsity_bars")
     plt.close(fig)
@@ -80,7 +81,7 @@ def sparsity():
     ax.set_yticks(range(len(p90)))
     ax.set_yticklabels([c.replace("agent-network-", "").replace("&p90", "") for c in p90], fontsize=7)
     ax.set_xlabel(f"Time window (× {SAMPLE_SEC}s)")
-    ax.set_title("Observability of the p90 latency metric across different agent services at a user load of 5 (Black = value present, White = missing).")
+    scale_figure_text(fig, 2)
     fig.tight_layout()
     save_fig(fig, "c2_latency_availability")
     plt.close(fig)
@@ -141,7 +142,7 @@ def variance(ax=None):
     bp = ax.boxplot(data, positions=positions, widths=0.8, patch_artist=True, showfliers=True)
     for patch, c in zip(bp["boxes"], colors):
         patch.set_facecolor(c); patch.set_alpha(.7)
-    ax.axhline(0.5, ls="--", color="grey", alpha=.7)
+    ax.axhline(0.5, ls="--", color=COLORS["reference"], alpha=.7)
     ax.set_xticks([t[0] for t in ticks])
     ax.set_xticklabels([t[1] for t in ticks])
     ax.set_ylabel("Coefficient of variation (CV = std/mean)")
@@ -189,7 +190,8 @@ def lag():
         q = qps.drop(columns=["timestamp"]).apply(pd.to_numeric, errors="coerce").sum(axis=1).values
         n = min(len(q), len(res))
         q = q[:n]
-        for resp, col, color in [("CPU", "vCPU", "#4C72B0"), ("Memory", "memory", "#DD8452")]:
+        for resp, col, color in [("CPU", "vCPU", COLORS["cpu"]),
+                     ("Memory", "memory", COLORS["memory"])]:
             series = res[col].values[:n]
             c = ccf(q, series, MAXLAG)
             lags = sorted(c.keys())
@@ -200,7 +202,7 @@ def lag():
             rows.append({"load": name, "response": resp,
                          "peak_lag_s": best * SAMPLE_SEC,
                          "peak_corr": round(float(c[best]), 2)})
-        ax.axvline(0, color="grey", lw=.8)
+        ax.axvline(0, color=COLORS["reference"], lw=.8)
         ax.set_title(name)
         ax.set_xlabel("Lag of resource response relative to QPS (s)")
         ax.grid(ls=":", alpha=.5)
@@ -228,9 +230,9 @@ def lag():
         return (a - np.nanmean(a)) / (np.nanstd(a) + 1e-9)
 
     fig, ax = plt.subplots(figsize=(11, 4))
-    ax.plot(t, z(q), label="Total QPS", color="black", lw=1.5)
-    ax.plot(t, z(res["vCPU"].values), label="vCPU", color="#4C72B0", alpha=.8)
-    ax.plot(t, z(res["memory"].values), label="Memory", color="#DD8452", alpha=.8)
+    ax.plot(t, z(q), label="Total QPS", color=COLORS["entry"], lw=1.5)
+    ax.plot(t, z(res["vCPU"].values), label="vCPU", color=COLORS["cpu"], alpha=.8)
+    ax.plot(t, z(res["memory"].values), label="Memory", color=COLORS["memory"], alpha=.8)
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Z-score (normalized)")
     ax.set_title("CPU trails the request load while memory accumulates slowly and persists at a user load of 5.")
@@ -346,9 +348,9 @@ def lag_chain():
         return (a - a.mean()) / (a.std() + 1e-9)
 
     fig, ax = plt.subplots(figsize=(11, 4.2))
-    ax.plot(t, z(sm["agent-network-planner"]), color="black", lw=1.8, label="planner (entry)")
-    ax.plot(t, z(sm["agent-network-word-gen"]), color="#4C72B0", alpha=.8, label="word-gen (middle)")
-    ax.plot(t, z(sm["agent-network-summarizer"]), color="#C44E52", alpha=.9, label="summarizer (exit)")
+    ax.plot(t, z(sm["agent-network-planner"]), color=COLORS["entry"], lw=1.8, label="planner (entry)")
+    ax.plot(t, z(sm["agent-network-word-gen"]), color=COLORS["middle"], alpha=.8, label="word-gen (middle)")
+    ax.plot(t, z(sm["agent-network-summarizer"]), color=COLORS["exit"], alpha=.9, label="summarizer (exit)")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Z-score of QPS (smoothed)")
     ax.set_title("The exit-service request pulses arrive later than the entry-service pulses at a user load of 5.")
@@ -441,7 +443,7 @@ def heterogeneity():
     fig, axes = plt.subplots(1, 3, figsize=(13, 4.6))
     for ax, (col, lab) in zip(axes, panels):
         sub = tab.sort_values(col)
-        ax.barh(sub["service"], sub[col], color="#4C72B0", alpha=.8)
+        ax.barh(sub["service"], sub[col], color=COLORS["trace"], alpha=.8)
         ax.set_xscale("log")
         v = sub[col].dropna()
         # explicit, readable ticks: 6 values evenly spaced in log over the data range
@@ -463,7 +465,7 @@ def heterogeneity():
         ax.set_title(f"{lab}\n(max/min ≈ {v.max()/max(v.min(),1e-9):.0f}×)", fontsize=10)
         ax.tick_params(axis="y", labelsize=8)
         ax.grid(axis="x", ls=":", alpha=.5)
-    fig.suptitle("Differences in CPU, memory, and execution time metrics across different services.")
+    scale_figure_text(fig, 2)
     fig.tight_layout(rect=[0, 0, 1, 0.9])
     save_fig(fig, "c2b_service_heterogeneity")
     plt.close(fig)

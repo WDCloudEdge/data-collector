@@ -21,7 +21,7 @@ if __name__ == "__main__":
     print("=" * 60, "\n[4/5] multi_replica_recheck (新1-user多副本: 负滞后复核 + 全结论复跑)")
     import multi_replica_recheck
     multi_replica_recheck.main()
-    print("=" * 60, "\n[5/5] abnormal_analysis (正常/异常对照 + 异常窗口错位)")
-    import abnormal_analysis
-    abnormal_analysis.main()
+    # print("=" * 60, "\n[5/5] abnormal_analysis (正常/异常对照 + 异常窗口错位)")
+    # import abnormal_analysis
+    # abnormal_analysis.main()
     print("=" * 60, "\nALL DONE -> analysis/figures, analysis/tables")
