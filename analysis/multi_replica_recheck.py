@@ -111,7 +111,7 @@ def lag_recheck():
         ax.grid(ls=":", alpha=.5)
         ax.legend(fontsize=8, title="Normal workload")
     axc.set_ylabel("Cross-correlation")
-    scale_figure_text(fig, 2)
+    scale_figure_text(fig, 1.4)
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     save_fig(fig, "recheck_lag_ccf")
     plt.close(fig)
