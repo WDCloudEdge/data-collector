@@ -97,7 +97,7 @@ def chain_c1(data):
                               "p90_s": round(float(np.percentile(v, 90)), 1),
                               "iqr_s": round(float(np.percentile(v, 75) - np.percentile(v, 25)), 1)})
     np.atleast_1d(axes)[0].set_ylabel("Cumulative completion time (s)")
-    scale_figure_text(fig, 1.4)
+    scale_figure_text(fig, 2)
     fig.tight_layout()
     save_fig(fig, "c1r_completion_by_depth")
     plt.close(fig)
@@ -160,7 +160,21 @@ def chain_c2(data):
         return v.split("/")[0]
 
     # ---- invocation frequency (sparsity), 5 users ----
-    fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
+    # Use compact display names while retaining full identifiers in the data.
+    service_labels = {
+        "AgentNetworkPlannerGroup": "Planner",
+        "WordGenerationAgentGroup": "WordGen",
+        "ExcelGroup": "Excel",
+        "PdfAgentGroup": "PDF",
+        "PdfGenAgentGroup": "PDFGen",
+        "ExcelGenGroup": "ExcelGen",
+        "DirectionAgentGroup": "Direction",
+        "ImageGenAgentGroup": "ImageGen",
+        "WordAgentGroup": "Word",
+        "OCRParserGroup": "OCR",
+        "CSVGeneratorAgentGroup": "CSVGen",
+    }
+    fig, axes = plt.subplots(1, 2, figsize=(18, 7.5))
     vtab = []
     for name in ORDER:
         cnt = collections.Counter()
@@ -187,6 +201,8 @@ def chain_c2(data):
     # left: coverage bars (5 users), sorted
     sub = vt[vt.load == "5 users"].sort_values("coverage", ascending=True)
     axes[0].barh(sub["vertex"], sub["coverage"] * 100, color=PALETTE["5 users"], alpha=.8)
+    axes[0].set_yticks(range(len(sub)),
+                      labels=[service_labels.get(v, v) for v in sub["vertex"]])
     axes[0].set_xlabel("Percentage of traces\ncovering the service (%)")
     axes[0].tick_params(axis="y", labelsize=7)
     axes[0].grid(axis="x", ls=":", alpha=.5)
@@ -197,11 +213,13 @@ def chain_c2(data):
     data_cv = [d for d in data_cv if len(d)]
     allcv = vt.groupby("vertex")["time_cv"].mean().sort_values(ascending=True)
     axes[1].barh(allcv.index, allcv.values, color=COLORS["variance"], alpha=.8)
+    axes[1].set_yticks(range(len(allcv)),
+                      labels=[service_labels.get(v, v) for v in allcv.index])
     axes[1].axvline(1.0, ls="--", color=COLORS["reference"])
-    axes[1].set_xlabel("Coefficient of variation of execution time\n(CV) = σ/μ (standard deviation/mean)")
+    axes[1].set_xlabel("Coefficient of variation\nof execution time (CV) = σ/μ\n(standard deviation/mean)")
     axes[1].tick_params(axis="y", labelsize=7)
     axes[1].grid(axis="x", ls=":", alpha=.5)
-    scale_figure_text(fig, 1.4)
+    scale_figure_text(fig, 2.8)
     fig.tight_layout(w_pad=2.0)
     save_fig(fig, "c2r_vertex_sparsity_variance")
     plt.close(fig)

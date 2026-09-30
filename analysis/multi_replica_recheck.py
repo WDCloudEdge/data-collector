@@ -92,7 +92,7 @@ def lag_recheck():
 
     # figure: two panels in ONE image — CPU and Memory across 1/3/5 users
     # (all multi-replica; loads 1/3/5). One line per user load.
-    fig, (axc, axm) = plt.subplots(1, 2, figsize=(12, 4.6))
+    fig, (axc, axm) = plt.subplots(1, 2, figsize=(16, 6.5))
     for ax, resp, loads, title in [
         (axc, "vCPU", ["1 user", "3 users", "5 users"], "QPS → CPU"),
         (axm, "memory", ["1 user", "3 users", "5 users"], "QPS → Memory"),
@@ -111,7 +111,7 @@ def lag_recheck():
         ax.grid(ls=":", alpha=.5)
         ax.legend(fontsize=8, title="Normal workload")
     axc.set_ylabel("Cross-correlation")
-    scale_figure_text(fig, 1.4)
+    scale_figure_text(fig, 2.8)
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     save_fig(fig, "recheck_lag_ccf")
     plt.close(fig)

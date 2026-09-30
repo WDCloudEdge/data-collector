@@ -462,7 +462,7 @@ def heterogeneity():
         ax.xaxis.set_minor_locator(NullLocator())            # drop the sparse auto minor ticks
         ax.set_xticklabels([_fmt(t) for t in ticks], fontsize=7, rotation=30, ha="right")
         ax.set_xlim(lo / 1.15, hi * 1.15)
-        ax.set_title(f"{lab}\n(max/min ≈ {v.max()/max(v.min(),1e-9):.0f}×)", fontsize=10)
+        ax.set_xlabel(f"{lab}\n(max/min ≈ {v.max()/max(v.min(),1e-9):.0f}×)", fontsize=10)
         ax.tick_params(axis="y", labelsize=8)
         ax.grid(axis="x", ls=":", alpha=.5)
     scale_figure_text(fig, 1.4)
