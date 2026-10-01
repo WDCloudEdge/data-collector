@@ -87,7 +87,8 @@ def chain_c1(data):
                         patch_artist=True, showfliers=False)
         for patch in bp["boxes"]:
             patch.set_facecolor(C1_COLOR[name]); patch.set_alpha(.7)
-        ax.set_title(name.replace(" (multi)", ""))
+        ax.text(0.5, 0.96, name.replace(" (multi)", ""),
+                transform=ax.transAxes, ha="center", va="top", fontsize=12)
         ax.set_xlabel("Call chain depth")
         ax.grid(axis="y", ls=":", alpha=.5)
         for d in depths:
@@ -99,6 +100,8 @@ def chain_c1(data):
     np.atleast_1d(axes)[0].set_ylabel("Cumulative completion time (s)")
     scale_figure_text(fig, 2)
     fig.tight_layout()
+    # Match vertical plot bounds for equal-height placement in the paper.
+    fig.subplots_adjust(bottom=0.20, top=0.96)
     save_fig(fig, "c1r_completion_by_depth")
     plt.close(fig)
     pd.DataFrame(depth_tab).to_csv(os.path.join(TAB, "chain_completion_by_depth.csv"), index=False)

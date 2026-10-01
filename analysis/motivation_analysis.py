@@ -437,36 +437,43 @@ def heterogeneity():
     tab = pd.DataFrame(rows)
     tab.to_csv(os.path.join(TAB, "service_heterogeneity.csv"), index=False)
 
-    panels = [("cpu_mean", "Mean CPU usage (cores)"), ("mem_mean_MB", "Mean Memory usage (MB)"),
-              ("exec_med_s", "Median Execution time (s)")]
+    # Compare different units using each metric's minimum service value as 1x.
+    metrics = [("cpu_mean", "CPU", "#0072B2"),
+               ("mem_mean_MB", "Memory", "#E69F00"),
+               ("exec_med_s", "Execution", "#009E73")]
     from matplotlib.ticker import NullLocator
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4.6))
-    for ax, (col, lab) in zip(axes, panels):
-        sub = tab.sort_values(col)
-        ax.barh(sub["service"], sub[col], color=COLORS["trace"], alpha=.8)
-        ax.set_xscale("log")
-        v = sub[col].dropna()
-        # explicit, readable ticks: 6 values evenly spaced in log over the data range
-        lo, hi = float(v.min()), float(v.max())
-        ticks = np.geomspace(lo, hi, 6)
-
-        def _fmt(t):
-            if t >= 100:
-                return f"{t:.0f}"
-            if t >= 10:
-                return f"{t:.0f}"
-            if t >= 1:
-                return f"{t:.1f}"
-            return f"{t:.3f}"
-        ax.set_xticks(ticks)
-        ax.xaxis.set_minor_locator(NullLocator())            # drop the sparse auto minor ticks
-        ax.set_xticklabels([_fmt(t) for t in ticks], fontsize=7, rotation=30, ha="right")
-        ax.set_xlim(lo / 1.15, hi * 1.15)
-        ax.set_xlabel(f"{lab}\n(max/min ≈ {v.max()/max(v.min(),1e-9):.0f}×)", fontsize=10)
-        ax.tick_params(axis="y", labelsize=8)
-        ax.grid(axis="x", ls=":", alpha=.5)
-    scale_figure_text(fig, 1.4)
-    fig.tight_layout(rect=[0, 0, 1, 0.9])
+    fig, ax = plt.subplots(figsize=(9.5, 4.8))
+    positions = np.arange(len(tab))
+    bar_width = 0.23
+    for i, (col, label, color) in enumerate(metrics):
+        values = tab[col].where(tab[col] > 0)
+        relative = values / values.min()
+        ratio = float(relative.max())
+        ax.bar(positions + (i - 1) * bar_width, relative,
+                width=bar_width, color=color, alpha=.9,
+                label=f"{label} (≈{ratio:.0f}×)")
+    ax.set_xticks(positions, labels=[s.replace("-", "\n") for s in tab["service"]])
+    ax.set_yscale("log")
+    ax.set_ylim(0.8, 70)
+    ax.margins(x=0.025)
+    ticks = [1, 2, 5, 10, 20, 50]
+    ax.set_yticks(ticks, labels=[f"{tick}×" for tick in ticks])
+    ax.yaxis.set_minor_locator(NullLocator())
+    ax.axhline(1, color=COLORS["reference"], ls="--", lw=.8)
+    ax.set_ylabel("Relative to metric minimum\n(log scale)")
+    ax.set_axisbelow(True)
+    ax.grid(axis="y", ls=":", alpha=.35)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("black")
+    ax.legend(loc="upper right", ncol=1, fontsize=10,
+              frameon=True, facecolor="white", framealpha=.95,
+              handlelength=1.2, labelspacing=.2, borderpad=.25)
+    # Match c's font size after equal-height placement in the paper.
+    scale_figure_text(fig, 2 * fig.get_figheight() / 4.4)
+    fig.tight_layout()
+    # Match vertical plot bounds for equal-height placement in the paper.
+    fig.subplots_adjust(bottom=0.20, top=0.96)
     save_fig(fig, "c2b_service_heterogeneity")
     plt.close(fig)
     return tab

@@ -90,29 +90,41 @@ def lag_recheck():
                 rows.append({"load": load, "replicas": tag, "response": resp,
                              "peak_lag_s": peak, "peak_corr": round(pr, 2)})
 
-    # figure: two panels in ONE image — CPU and Memory across 1/3/5 users
-    # (all multi-replica; loads 1/3/5). One line per user load.
-    fig, (axc, axm) = plt.subplots(1, 2, figsize=(16, 6.5))
-    for ax, resp, loads, title in [
-        (axc, "vCPU", ["1 user", "3 users", "5 users"], "QPS → CPU"),
-        (axm, "memory", ["1 user", "3 users", "5 users"], "QPS → Memory"),
+    # One axes: workload uses color; resource uses line style and marker.
+    fig, ax = plt.subplots(figsize=(13, 8.6))
+    for resp, resource, linestyle, marker in [
+        ("vCPU", "CPU", "-", "o"),
+        ("memory", "Memory", "--", "s"),
     ]:
-        for name in loads:
+        for name in ["1 user", "3 users", "5 users"]:
             q, r = _total_qps_and_res(FIG_MULTI[name], resp)
             lags, vals = ccf_curve(q, r)
             peak = int(lags[int(np.nanargmax(vals))])
             pr = float(np.nanmax(vals))
-            ax.plot(lags, vals, marker="o", ms=3, color=PALETTE[name],
-                    label=f"{name} (peak {peak:+d}s, r={pr:.2f})")
+            ax.plot(lags, vals, marker=marker, ms=4, ls=linestyle,
+                    lw=1.8, color=PALETTE[name],
+                    label=f"{resource} {name.split()[0]}u: {peak:+d}s/{pr:.2f}")
             ax.axvline(peak, ls="--", alpha=.4, color=PALETTE[name])
-        ax.axvline(0, color=COLORS["reference"], lw=.8)
-        # ax.set_title(title)
-        ax.set_xlabel("Metric lag (s)")
-        ax.grid(ls=":", alpha=.5)
-        ax.legend(fontsize=8, title="Normal workload")
-    axc.set_ylabel("Cross-correlation")
-    scale_figure_text(fig, 2.8)
-    fig.tight_layout(rect=[0, 0, 1, 0.93])
+            ax.plot(peak, pr, marker=marker, ms=8, color=PALETTE[name],
+                    markeredgecolor="black", markeredgewidth=.8, zorder=4)
+    ax.axvline(0, color=COLORS["reference"], lw=.8)
+    ax.set_xlabel("Metric lag (s)")
+    ax.set_ylabel("Cross-correlation")
+    ax.grid(ls=":", alpha=.4)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("black")
+    handles, labels = ax.get_legend_handles_labels()
+    ax.set_ylim(0, 1)
+    ax.legend(handles, labels, loc="lower center", ncol=2,
+              fontsize=8, frameon=True, facecolor="white", framealpha=.95,
+              handlelength=1.2, handletextpad=.4, columnspacing=.8,
+              labelspacing=.2, borderpad=.25)
+    # Equal-height paper placement: match c's 20 pt text on a 4.4-inch canvas.
+    scale_figure_text(fig, 2 * fig.get_figheight() / 4.4)
+    fig.tight_layout()
+    # Match vertical plot bounds for equal-height placement in the paper.
+    fig.subplots_adjust(bottom=0.20, top=0.96)
     save_fig(fig, "recheck_lag_ccf")
     plt.close(fig)
     return pd.DataFrame(rows)
