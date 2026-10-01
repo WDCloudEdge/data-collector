@@ -356,6 +356,8 @@ def collect_ctn_metric(config: Config, _dir: str, is_header: bool):
         prom_network_sql = 'sum(rate(container_network_transmit_packets_total{namespace=\"%s\", pod="%s"}[1m])) * sum(rate(container_network_transmit_packets_total{namespace=\"%s\", pod="%s"}[1m]))' % (
             config.namespace, pod_name, config.namespace, pod_name)
         response = prom_util.execute_prom(config.prom_range_url_node, prom_network_sql)
+        if response == []:
+            continue
         container_df = pd.DataFrame()
         values = response[0]['values']
         values = list(zip(*values))

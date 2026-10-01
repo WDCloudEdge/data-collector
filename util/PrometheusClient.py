@@ -1,10 +1,19 @@
 import time
+import re
 import requests
 import networkx as nx
 import pandas as pd
 import numpy as np
 import Config
 from util.KubernetesClient import KubernetesClient
+
+
+_DEPLOYMENT_POD_SUFFIX = re.compile(r'-[a-z0-9]{8,10}-[a-z0-9]{5}$')
+
+
+def _service_of_pod(pod):
+    """Return the owning service name for a Deployment-managed pod."""
+    return _DEPLOYMENT_POD_SUFFIX.sub('', pod)
 
 
 class PrometheusClient:
@@ -297,25 +306,25 @@ class PrometheusClient:
         for svc in svcs:
             if svc == 'loadgenerator':
                 continue
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('cpu_usage')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('cpu_usage')]
             final_df[svc + '&cpu_usage'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('cpu_limit')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('cpu_limit')]
             final_df[svc + '&cpu_limit'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('mem_usage')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('mem_usage')]
             final_df[svc + '&mem_usage'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('mem_usage_rate')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('mem_usage_rate')]
             final_df[svc + '&mem_usage_rate'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('mem_limit')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('mem_limit')]
             final_df[svc + '&mem_limit'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('fs_usage')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('fs_usage')]
             final_df[svc + '&fs_usage'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('fs_write')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('fs_write')]
             final_df[svc + '&fs_write'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('fs_read')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('fs_read')]
             final_df[svc + '&fs_read'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('net_receive')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('net_receive')]
             final_df[svc + '&net_receive'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('net_trainsmit')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('net_trainsmit')]
             final_df[svc + '&net_trainsmit'] = df[svc_cols].sum(axis=1)
         final_df['timestamp'] = final_df.index
         final_df['timestamp'] = final_df['timestamp'].astype('datetime64[s]')
@@ -435,25 +444,25 @@ class PrometheusClient:
         for svc in svcs:
             if svc == 'loadgenerator':
                 continue
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('cpu_usage')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('cpu_usage')]
             final_df[svc + '&cpu_usage'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('cpu_limit')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('cpu_limit')]
             final_df[svc + '&cpu_limit'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('mem_usage')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('mem_usage')]
             final_df[svc + '&mem_usage'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('mem_usage_rate')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('mem_usage_rate')]
             final_df[svc + '&mem_usage_rate'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('mem_limit')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('mem_limit')]
             final_df[svc + '&mem_limit'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('fs_usage')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('fs_usage')]
             final_df[svc + '&fs_usage'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('fs_write')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('fs_write')]
             final_df[svc + '&fs_write'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('fs_read')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('fs_read')]
             final_df[svc + '&fs_read'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('net_receive')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('net_receive')]
             final_df[svc + '&net_receive'] = df[svc_cols].sum(axis=1)
-            svc_cols = [col for col in col_list if col.startswith(svc) and col.endswith('net_trainsmit')]
+            svc_cols = [col for col in col_list if _service_of_pod(col.split('&')[0]) == svc and col.endswith('net_trainsmit')]
             final_df[svc + '&net_trainsmit'] = df[svc_cols].sum(axis=1)
 
         return final_df
