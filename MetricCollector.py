@@ -168,40 +168,32 @@ def collect_resource_metric(config: Config, _dir: str, is_header: bool):
 
 # Get the number of pods for all microservices
 def collect_pod_num(config: Config, _dir: str, is_header: bool):
-    instance_df = pd.DataFrame()
     prom_util = PrometheusClient(config)
     pod_sql = 'kube_pod_info{namespace="%s"}' % config.namespace
     response = prom_util.execute_prom(config.prom_range_url_node, pod_sql)
-
+    pod_frames = []
     for result in response:
         if 'created_by_name' in result['metric'] and 'pod_ip' in result['metric']:
-            name = result['metric']['created_by_name']
+            owner = result['metric']['created_by_name']
+            service = owner.rsplit('-', 1)[0] if '-' in owner else owner
             values = result['values']
-            values = list(zip(*values))
-            deployment_df = pd.DataFrame()
-            timestamp = values[0]
-            deployment_df['timestamp'] = timestamp
-            deployment_df['timestamp'] = deployment_df['timestamp'].astype('datetime64[s]')
-            metric = pd.Series(values[1])
-            deployment_df[name] = metric
-            deployment_df = deployment_df.fillna(0)
-            deployment_df[name] = deployment_df[name].astype('float64')
-            if instance_df.empty:
-                instance_df = deployment_df
-            else:
-                instance_df = pd.merge(instance_df, deployment_df, on='timestamp', how='outer')
-            instance_df = instance_df.fillna(0)
+            if not values:
+                continue
+            pod_frames.append(pd.DataFrame({
+                'timestamp': pd.to_datetime([value[0] for value in values], unit='s'),
+                'service': service + '&count',
+                'value': [float(value[1]) for value in values],
+            }))
 
-    instance_num_df = pd.DataFrame()
-    for column in instance_df.columns:
-        if column == 'timestamp':
-            continue
-        name = column[:column.rfind('-')] + '&count'
-        if name not in instance_num_df.columns:
-            instance_num_df[name] = instance_df[column]
-        else:
-            instance_num_df[name] = instance_num_df[name] + instance_df[column]
-    instance_num_df['timestamp'] = instance_df['timestamp']
+    if pod_frames:
+        samples = pd.concat(pod_frames, ignore_index=True)
+        instance_num_df = samples.pivot_table(
+            index='timestamp', columns='service', values='value',
+            aggfunc='sum', fill_value=0,
+        ).reset_index().sort_values('timestamp')
+        instance_num_df.columns.name = None
+    else:
+        instance_num_df = pd.DataFrame(columns=['timestamp'])
 
     path = os.path.join(_dir, 'instances_num.csv')
     _write_metric_csv(instance_num_df, path, is_header)
